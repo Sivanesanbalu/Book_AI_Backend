@@ -5,3 +5,8 @@ python-multipart
 pydantic
 pytesseract
 opencv-python-headless
+Pillow
+faiss-cpu
+sentence-transformers
+numpy
+torch
