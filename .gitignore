@@ -1,5 +1,15 @@
+# Python
 venv/
 __pycache__/
+*.pyc
+
+# Environment secrets
 .env
 serviceAccountKey.json
-uploads\serviceAccountKey.json
+
+# Uploads (user images)
+uploads/
+
+# OS junk
+.DS_Store
+Thumbs.db
