@@ -1,5 +1,9 @@
+import uvicorn
+import os
+
 from fastapi import FastAPI, UploadFile, File
 import shutil, os
+import uvicorn
 
 from ocr import extract_text
 from search_engine import search_book, add_book
@@ -53,3 +57,9 @@ async def capture_book(file: UploadFile = File(...)):
         "status": "saved",
         "title": text
     }
+
+
+# ⭐⭐⭐ THIS PART FIXES RENDER DEPLOY ⭐⭐⭐
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
