@@ -1,7 +1,7 @@
 services:
   - type: web
     name: book-ai-backend
-    runtime: python3  # Add this line
+    runtime: python
 
     buildCommand: |
       apt-get update
