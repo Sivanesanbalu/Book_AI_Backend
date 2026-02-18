@@ -2,9 +2,17 @@ import pytesseract
 import cv2
 import numpy as np
 from PIL import Image
+import shutil
 
-# Windows path (change if needed)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# -----------------------------------------
+# AUTO DETECT TESSERACT (Linux / Windows)
+# -----------------------------------------
+tesseract_path = shutil.which("tesseract")
+
+if tesseract_path is not None:
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+else:
+    print("WARNING: Tesseract not found in system PATH")
 
 
 ############################################################
@@ -24,7 +32,7 @@ def preprocess(image):
     # remove noise
     gray = cv2.bilateralFilter(gray, 11, 17, 17)
 
-    # adaptive threshold (better than binary)
+    # adaptive threshold
     thresh = cv2.adaptiveThreshold(
         gray, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -49,13 +57,13 @@ def clean_text(text: str):
         if len(line) < 3:
             continue
 
-        # ignore numbers / isbn heavy lines
+        # ignore isbn / numbers heavy lines
         if sum(c.isalpha() for c in line) < 3:
             continue
 
         cleaned.append(line)
 
-    # keep first 3 lines (usually title + author)
+    # title mostly first 3 lines
     return " ".join(cleaned[:3]).lower()
 
 
@@ -66,6 +74,9 @@ def extract_text(path: str) -> str:
 
     image = cv2.imread(path)
 
+    if image is None:
+        return ""
+
     processed = preprocess(image)
 
     raw_text = pytesseract.image_to_string(
@@ -75,6 +86,6 @@ def extract_text(path: str) -> str:
 
     final_text = clean_text(raw_text)
 
-    print("\nOCR DETECTED:", final_text)
+    print("\n📖 OCR DETECTED:", final_text)
 
     return final_text
