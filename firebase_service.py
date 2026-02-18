@@ -1,11 +1,18 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 import os
+import json
 from datetime import datetime
 
 # init only once
 if not firebase_admin._apps:
-    cred = credentials.Certificate("serviceAccountKey.json")
+    firebase_key = os.environ.get("FIREBASE_KEY")
+
+    if firebase_key is None:
+        raise Exception("FIREBASE_KEY environment variable not found")
+
+    cred_dict = json.loads(firebase_key)
+    cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
