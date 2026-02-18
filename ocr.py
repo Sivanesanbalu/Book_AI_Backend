@@ -1,80 +1,101 @@
 import pytesseract
 import cv2
 import numpy as np
-from PIL import Image
-import shutil
+import os
 
-# -----------------------------------------
-# AUTO DETECT TESSERACT (Linux / Windows)
-# -----------------------------------------
-tesseract_path = shutil.which("tesseract")
-
-if tesseract_path is not None:
-    pytesseract.pytesseract.tesseract_cmd = tesseract_path
-else:
-    print("WARNING: Tesseract not found in system PATH")
+# IMPORTANT: Render / Linux auto detect
+if os.name == "nt":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 
 ############################################################
-# IMAGE PREPROCESSING — REAL WORLD CAMERA FIX
+# AUTO ROTATE (fix tilted book)
+############################################################
+def correct_rotation(image):
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    coords = np.column_stack(np.where(gray > 0))
+
+    if len(coords) < 100:
+        return image
+
+    angle = cv2.minAreaRect(coords)[-1]
+
+    if angle < -45:
+        angle = 90 + angle
+    else:
+        angle = angle
+
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    return cv2.warpAffine(image, M, (w, h),
+                          flags=cv2.INTER_CUBIC,
+                          borderMode=cv2.BORDER_REPLICATE)
+
+
+############################################################
+# IMAGE PREPROCESSING
 ############################################################
 def preprocess(image):
 
-    # resize (important for OCR accuracy)
-    scale_percent = 150
-    width = int(image.shape[1] * scale_percent / 100)
-    height = int(image.shape[0] * scale_percent / 100)
-    image = cv2.resize(image, (width, height), interpolation=cv2.INTER_CUBIC)
+    # rotate fix
+    image = correct_rotation(image)
 
-    # convert gray
+    # upscale for better OCR
+    image = cv2.resize(image, None, fx=1.7, fy=1.7, interpolation=cv2.INTER_CUBIC)
+
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # remove noise
-    gray = cv2.bilateralFilter(gray, 11, 17, 17)
+    # remove shadow
+    blur = cv2.GaussianBlur(gray, (5,5), 0)
 
-    # adaptive threshold
-    thresh = cv2.adaptiveThreshold(
-        gray, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, 31, 2
-    )
+    # OTSU threshold (better for books)
+    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     return thresh
 
 
 ############################################################
-# TEXT CLEANING — ONLY TITLE IMPORTANT
+# TEXT CLEANING (SMART TITLE PICK)
 ############################################################
 def clean_text(text: str):
 
     lines = text.split("\n")
+    candidates = []
 
-    cleaned = []
     for line in lines:
         line = line.strip()
 
-        # ignore empty
-        if len(line) < 3:
+        if len(line) < 4:
             continue
 
-        # ignore isbn / numbers heavy lines
-        if sum(c.isalpha() for c in line) < 3:
+        # ignore ISBN / numbers
+        alpha_ratio = sum(c.isalpha() for c in line) / max(len(line),1)
+        if alpha_ratio < 0.5:
             continue
 
-        cleaned.append(line)
+        candidates.append(line)
 
-    # title mostly first 3 lines
-    return " ".join(cleaned[:3]).lower()
+    if not candidates:
+        return ""
+
+    # biggest line usually title
+    candidates.sort(key=len, reverse=True)
+
+    return candidates[0].lower()
 
 
 ############################################################
-# MAIN OCR FUNCTION
+# MAIN OCR
 ############################################################
 def extract_text(path: str) -> str:
 
     image = cv2.imread(path)
 
     if image is None:
+        print("OCR ERROR: image not loaded")
         return ""
 
     processed = preprocess(image)
@@ -86,6 +107,6 @@ def extract_text(path: str) -> str:
 
     final_text = clean_text(raw_text)
 
-    print("\n📖 OCR DETECTED:", final_text)
+    print("\nOCR DETECTED:", final_text)
 
     return final_text

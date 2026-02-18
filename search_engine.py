@@ -10,11 +10,16 @@ INDEX_PATH = os.path.join(DATA_DIR, "index.faiss")
 DB_PATH = os.path.join(DATA_DIR, "books_db.json")
 
 DIM = 384
-SIMILARITY_THRESHOLD = 0.78   # tuned for book titles
+SIMILARITY_THRESHOLD = 0.65   # LOWER for OCR tolerance
 
 lock = Lock()
-
 os.makedirs(DATA_DIR, exist_ok=True)
+
+
+# ---------------- UTIL ---------------- #
+
+def normalize(vec):
+    return vec / np.linalg.norm(vec, axis=1, keepdims=True)
 
 
 # ---------------- DB ---------------- #
@@ -33,21 +38,39 @@ def save_db(data):
 
 # ---------------- INDEX ---------------- #
 
-def get_index():
-    if os.path.exists(INDEX_PATH):
-        return faiss.read_index(INDEX_PATH)
-
-    # Cosine similarity index
+def rebuild_index(books):
+    """Always rebuild FAISS from DB (guaranteed sync)"""
     index = faiss.IndexFlatIP(DIM)
+
+    if len(books) == 0:
+        return index
+
+    embeddings = []
+    for b in books:
+        emb = get_embedding(b["title"]).reshape(1, -1)
+        emb = normalize(emb)
+        embeddings.append(emb)
+
+    embeddings = np.vstack(embeddings)
+    index.add(embeddings)
+
+    faiss.write_index(index, INDEX_PATH)
     return index
 
 
-def save_index(index):
-    faiss.write_index(index, INDEX_PATH)
+def get_index():
+    books = load_db()
 
+    # if index missing OR count mismatch → rebuild
+    if (not os.path.exists(INDEX_PATH)):
+        return rebuild_index(books)
 
-def normalize(vec):
-    return vec / np.linalg.norm(vec, axis=1, keepdims=True)
+    index = faiss.read_index(INDEX_PATH)
+
+    if index.ntotal != len(books):
+        return rebuild_index(books)
+
+    return index
 
 
 # ---------------- SEARCH ---------------- #
@@ -63,15 +86,12 @@ def search_book(text: str):
     query = get_embedding(text).reshape(1, -1)
     query = normalize(query)
 
-    if index.ntotal == 0:
-        return None, 0.0
-
     D, I = index.search(query, 1)
 
     score = float(D[0][0])
     idx = int(I[0][0])
 
-    if score >= SIMILARITY_THRESHOLD:
+    if idx < len(books) and score >= SIMILARITY_THRESHOLD:
         return books[idx], score
 
     return None, score
@@ -84,16 +104,16 @@ def add_book(title: str):
     with lock:
 
         books = load_db()
-        index = get_index()
 
-        emb = get_embedding(title).reshape(1, -1)
-        emb = normalize(emb)
+        # Prevent duplicates
+        for b in books:
+            if title.lower() in b["title"].lower() or b["title"].lower() in title.lower():
+                return b
 
-        index.add(emb)
-
-        books.append({
-            "title": title
-        })
-
+        books.append({"title": title})
         save_db(books)
-        save_index(index)
+
+        # Always rebuild index (safe)
+        rebuild_index(books)
+
+        return {"title": title}

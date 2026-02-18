@@ -10,42 +10,58 @@ model = SentenceTransformer(MODEL_NAME)
 INDEX_FILE = "data/book_index.faiss"
 META_FILE = "data/book_meta.pkl"
 
-dimension = 384  # MiniLM output size
+DIM = 384
+THRESHOLD = 0.78   # cosine similarity threshold
 
-# Load or create index
+
+# ---------------- NORMALIZE ----------------
+def normalize(vec):
+    return vec / np.linalg.norm(vec, axis=1, keepdims=True)
+
+
+# ---------------- LOAD INDEX ----------------
 if os.path.exists(INDEX_FILE):
     index = faiss.read_index(INDEX_FILE)
     with open(META_FILE, "rb") as f:
         metadata = pickle.load(f)
 else:
-    index = faiss.IndexFlatL2(dimension)
+    index = faiss.IndexFlatIP(DIM)  # cosine similarity
     metadata = []
 
-def get_embedding(text: str) -> np.ndarray:
-    emb = model.encode([text])[0]
-    return emb.astype("float32")
 
+# ---------------- EMBEDDING ----------------
+def get_embedding(text: str) -> np.ndarray:
+    emb = model.encode([text])[0].astype("float32")
+    emb = normalize(np.array([emb]))
+    return emb
+
+
+# ---------------- ADD BOOK ----------------
 def add_book(title: str):
     emb = get_embedding(title)
-    index.add(np.array([emb]))
-    metadata.append(title)
+    index.add(emb)
+    metadata.append({"title": title})
     save_index()
 
-def search_book(title: str, threshold=1.2):
-    if len(metadata) == 0:
-        return None
+
+# ---------------- SEARCH BOOK ----------------
+def search_book(title: str):
+    if len(metadata) == 0 or index.ntotal == 0:
+        return None, 0.0
 
     emb = get_embedding(title)
-    D, I = index.search(np.array([emb]), 1)
+    D, I = index.search(emb, 1)
 
-    distance = D[0][0]
-    idx = I[0][0]
+    score = float(D[0][0])
+    idx = int(I[0][0])
 
-    if distance < threshold:
-        return metadata[idx]
+    if score >= THRESHOLD:
+        return metadata[idx], score
 
-    return None
+    return None, score
 
+
+# ---------------- SAVE ----------------
 def save_index():
     faiss.write_index(index, INDEX_FILE)
     with open(META_FILE, "wb") as f:
