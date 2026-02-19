@@ -2,8 +2,9 @@ import pytesseract
 import cv2
 import numpy as np
 import os
+import re
 
-# IMPORTANT: Render / Linux auto detect
+# Windows auto detect
 if os.name == "nt":
     pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
@@ -23,8 +24,6 @@ def correct_rotation(image):
 
     if angle < -45:
         angle = 90 + angle
-    else:
-        angle = angle
 
     (h, w) = image.shape[:2]
     center = (w // 2, h // 2)
@@ -40,25 +39,40 @@ def correct_rotation(image):
 ############################################################
 def preprocess(image):
 
-    # rotate fix
     image = correct_rotation(image)
 
-    # upscale for better OCR
+    # upscale improves OCR heavily
     image = cv2.resize(image, None, fx=1.7, fy=1.7, interpolation=cv2.INTER_CUBIC)
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # remove shadow
     blur = cv2.GaussianBlur(gray, (5,5), 0)
 
-    # OTSU threshold (better for books)
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     return thresh
 
 
 ############################################################
-# TEXT CLEANING (SMART TITLE PICK)
+# OCR ERROR NORMALIZATION
+############################################################
+COMMON_OCR_FIX = {
+    "0": "o",
+    "1": "i",
+    "5": "s",
+    "8": "b",
+    "|": "i",
+}
+
+
+def normalize_ocr_errors(text: str):
+    for k, v in COMMON_OCR_FIX.items():
+        text = text.replace(k, v)
+    return text
+
+
+############################################################
+# TEXT CLEANING — STABLE TITLE EXTRACTION
 ############################################################
 def clean_text(text: str):
 
@@ -71,9 +85,18 @@ def clean_text(text: str):
         if len(line) < 4:
             continue
 
-        # ignore ISBN / numbers
+        # remove symbols
+        line = re.sub(r'[^A-Za-z0-9 ]', '', line)
+
+        # remove extra spaces
+        line = re.sub(r'\s+', ' ', line)
+
+        # fix OCR mistakes
+        line = normalize_ocr_errors(line)
+
+        # ignore ISBN / numeric heavy
         alpha_ratio = sum(c.isalpha() for c in line) / max(len(line),1)
-        if alpha_ratio < 0.5:
+        if alpha_ratio < 0.55:
             continue
 
         candidates.append(line)
@@ -81,10 +104,17 @@ def clean_text(text: str):
     if not candidates:
         return ""
 
-    # biggest line usually title
+    # longest meaningful line = title
     candidates.sort(key=len, reverse=True)
+    title = candidates[0]
 
-    return candidates[0].lower()
+    # remove noisy words
+    stop_words = ["by", "author", "edition", "press", "publication"]
+    words = [w for w in title.split() if w.lower() not in stop_words]
+
+    final = " ".join(words).lower()
+
+    return final.strip()
 
 
 ############################################################
