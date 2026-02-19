@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# ---------- SYSTEM DEPENDENCIES (VERY IMPORTANT) ----------
+# ---------- SYSTEM DEPENDENCIES ----------
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
@@ -16,10 +16,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ---------- PYTHON ----------
+# ---------- PYTHON SETTINGS ----------
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# ---------- INSTALL PYTHON PACKAGES ----------
 COPY requirements.txt .
 
-# Install CPU Torch first (avoid CUDA huge install)
+# install torch cpu first (stable)
+RUN pip install --upgrade pip
+
 RUN pip install --no-cache-dir \
     torch==2.2.2+cpu \
     torchvision==0.17.2+cpu \
@@ -27,14 +33,14 @@ RUN pip install --no-cache-dir \
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ---------- APP ----------
+# ---------- COPY PROJECT ----------
 COPY . .
 
-# Runtime folders
+# runtime folders
 RUN mkdir -p uploads data
 
-# (Optional debug – will show in logs)
+# debug (visible in render logs)
 RUN tesseract --version
 
 # ---------- START SERVER ----------
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]

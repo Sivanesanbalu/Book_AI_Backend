@@ -1,38 +1,26 @@
-
 import pytesseract
 import cv2
 import numpy as np
 import os
-import shutil
 import re
+import shutil
 
-# ---------------- AUTO DETECT TESSERACT ----------------
-def configure_tesseract():
-    # Windows
-    if os.name == "nt":
-        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        return
+############################################################
+# AUTO DETECT TESSERACT (Windows + Linux + Docker + Render)
+############################################################
+tesseract_path = shutil.which("tesseract")
 
-    # Linux (Render / Docker)
-    possible_paths = [
-        "/usr/bin/tesseract",
-        "/usr/local/bin/tesseract",
-    ]
-
-    for path in possible_paths:
-        if os.path.exists(path):
-            pytesseract.pytesseract.tesseract_cmd = path
-            return
-
-    raise RuntimeError("Tesseract not installed in system!")
-
-configure_tesseract()
+if tesseract_path:
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+else:
+    print("WARNING: Tesseract not found in PATH")
 
 
 ############################################################
-# AUTO ROTATE
+# AUTO ROTATE (fix tilted book)
 ############################################################
 def correct_rotation(image):
+
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     coords = np.column_stack(np.where(gray > 0))
 
@@ -40,6 +28,7 @@ def correct_rotation(image):
         return image
 
     angle = cv2.minAreaRect(coords)[-1]
+
     if angle < -45:
         angle = 90 + angle
 
@@ -47,27 +36,52 @@ def correct_rotation(image):
     center = (w // 2, h // 2)
 
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    return cv2.warpAffine(image, M, (w, h),
-                          flags=cv2.INTER_CUBIC,
-                          borderMode=cv2.BORDER_REPLICATE)
+    return cv2.warpAffine(
+        image, M, (w, h),
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_REPLICATE
+    )
 
 
 ############################################################
-# PREPROCESS
+# IMAGE PREPROCESSING
 ############################################################
 def preprocess(image):
+
     image = correct_rotation(image)
+
+    # upscale improves OCR heavily
     image = cv2.resize(image, None, fx=1.7, fy=1.7, interpolation=cv2.INTER_CUBIC)
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
     blur = cv2.GaussianBlur(gray, (5,5), 0)
+
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     return thresh
 
 
 ############################################################
-# CLEAN TEXT
+# OCR ERROR NORMALIZATION
+############################################################
+COMMON_OCR_FIX = {
+    "0": "o",
+    "1": "i",
+    "5": "s",
+    "8": "b",
+    "|": "i",
+}
+
+
+def normalize_ocr_errors(text: str):
+    for k, v in COMMON_OCR_FIX.items():
+        text = text.replace(k, v)
+    return text
+
+
+############################################################
+# TEXT CLEANING — STABLE TITLE EXTRACTION
 ############################################################
 def clean_text(text: str):
 
@@ -80,9 +94,16 @@ def clean_text(text: str):
         if len(line) < 4:
             continue
 
+        # remove symbols
         line = re.sub(r'[^A-Za-z0-9 ]', '', line)
+
+        # remove extra spaces
         line = re.sub(r'\s+', ' ', line)
 
+        # fix OCR mistakes
+        line = normalize_ocr_errors(line)
+
+        # ignore ISBN / numeric heavy
         alpha_ratio = sum(c.isalpha() for c in line) / max(len(line),1)
         if alpha_ratio < 0.55:
             continue
@@ -92,8 +113,17 @@ def clean_text(text: str):
     if not candidates:
         return ""
 
+    # longest meaningful line = title
     candidates.sort(key=len, reverse=True)
-    return candidates[0].lower().strip()
+    title = candidates[0]
+
+    # remove noisy words
+    stop_words = ["by", "author", "edition", "press", "publication"]
+    words = [w for w in title.split() if w.lower() not in stop_words]
+
+    final = " ".join(words).lower()
+
+    return final.strip()
 
 
 ############################################################
@@ -101,20 +131,26 @@ def clean_text(text: str):
 ############################################################
 def extract_text(path: str) -> str:
 
-    image = cv2.imread(path)
+    try:
+        image = cv2.imread(path)
 
-    if image is None:
+        if image is None:
+            print("OCR ERROR: image not loaded")
+            return ""
+
+        processed = preprocess(image)
+
+        raw_text = pytesseract.image_to_string(
+            processed,
+            config="--oem 3 --psm 6 -l eng"
+        )
+
+        final_text = clean_text(raw_text)
+
+        print("\nOCR DETECTED:", final_text)
+
+        return final_text
+
+    except Exception as e:
+        print("OCR FAILED:", e)
         return ""
-
-    processed = preprocess(image)
-
-    raw_text = pytesseract.image_to_string(
-        processed,
-        config="--oem 3 --psm 6 -l eng"
-    )
-
-    final_text = clean_text(raw_text)
-
-    print("OCR DETECTED:", final_text)
-
-    return final_text
