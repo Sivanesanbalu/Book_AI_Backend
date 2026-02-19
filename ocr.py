@@ -3,15 +3,24 @@ import cv2
 import numpy as np
 import os
 import re
-
-# Windows auto detect
-if os.name == "nt":
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+import shutil
 
 
-############################################################
+# -------------------------------------------------------
+# AUTO DETECT TESSERACT (WORKS IN RENDER / DOCKER / LOCAL)
+# -------------------------------------------------------
+tesseract_path = shutil.which("tesseract")
+
+if tesseract_path:
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+    print("✅ Tesseract detected at:", tesseract_path)
+else:
+    print("❌ Tesseract NOT found — OCR will fail")
+
+
+# -------------------------------------------------------
 # AUTO ROTATE (fix tilted book)
-############################################################
+# -------------------------------------------------------
 def correct_rotation(image):
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -29,14 +38,17 @@ def correct_rotation(image):
     center = (w // 2, h // 2)
 
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    return cv2.warpAffine(image, M, (w, h),
-                          flags=cv2.INTER_CUBIC,
-                          borderMode=cv2.BORDER_REPLICATE)
+
+    return cv2.warpAffine(
+        image, M, (w, h),
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_REPLICATE
+    )
 
 
-############################################################
-# IMAGE PREPROCESSING
-############################################################
+# -------------------------------------------------------
+# IMAGE PREPROCESSING (high accuracy)
+# -------------------------------------------------------
 def preprocess(image):
 
     image = correct_rotation(image)
@@ -53,9 +65,9 @@ def preprocess(image):
     return thresh
 
 
-############################################################
+# -------------------------------------------------------
 # OCR ERROR NORMALIZATION
-############################################################
+# -------------------------------------------------------
 COMMON_OCR_FIX = {
     "0": "o",
     "1": "i",
@@ -71,9 +83,9 @@ def normalize_ocr_errors(text: str):
     return text
 
 
-############################################################
-# TEXT CLEANING — STABLE TITLE EXTRACTION
-############################################################
+# -------------------------------------------------------
+# TEXT CLEANING — SMART TITLE PICK
+# -------------------------------------------------------
 def clean_text(text: str):
 
     lines = text.split("\n")
@@ -94,7 +106,7 @@ def clean_text(text: str):
         # fix OCR mistakes
         line = normalize_ocr_errors(line)
 
-        # ignore ISBN / numeric heavy
+        # ignore numeric heavy lines
         alpha_ratio = sum(c.isalpha() for c in line) / max(len(line),1)
         if alpha_ratio < 0.55:
             continue
@@ -104,7 +116,7 @@ def clean_text(text: str):
     if not candidates:
         return ""
 
-    # longest meaningful line = title
+    # longest line usually title
     candidates.sort(key=len, reverse=True)
     title = candidates[0]
 
@@ -117,15 +129,15 @@ def clean_text(text: str):
     return final.strip()
 
 
-############################################################
-# MAIN OCR
-############################################################
+# -------------------------------------------------------
+# MAIN OCR FUNCTION
+# -------------------------------------------------------
 def extract_text(path: str) -> str:
 
     image = cv2.imread(path)
 
     if image is None:
-        print("OCR ERROR: image not loaded")
+        print("❌ OCR ERROR: image not loaded")
         return ""
 
     processed = preprocess(image)
@@ -137,6 +149,6 @@ def extract_text(path: str) -> str:
 
     final_text = clean_text(raw_text)
 
-    print("\nOCR DETECTED:", final_text)
+    print("\n📖 OCR DETECTED:", final_text)
 
     return final_text

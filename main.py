@@ -4,7 +4,7 @@ import uuid
 from fastapi import FastAPI, UploadFile, File
 
 from ocr import extract_text
-from search_engine import search_book
+from search_engine import search_book, add_book   # 🔥 IMPORTANT CHANGE
 from firebase_service import save_book_for_user, user_has_book
 
 app = FastAPI()
@@ -66,7 +66,7 @@ async def scan_book(uid: str, file: UploadFile = File(...)):
 
 
 ############################################################
-# 📸 CAPTURE — SAVE BOOK
+# 📸 CAPTURE — SAVE BOOK + TRAIN AI
 ############################################################
 @app.post("/capture")
 async def capture_book(uid: str, file: UploadFile = File(...)):
@@ -76,13 +76,25 @@ async def capture_book(uid: str, file: UploadFile = File(...)):
     try:
         text = extract_text(path)
 
-        if not text:
+        if not text or len(text) < 3:
             return {"status": "failed"}
 
         book, score = search_book(text)
 
-        final_title = book["title"] if book else text
+        # -------------------------------
+        # BOOK ALREADY EXISTS IN AI DB
+        # -------------------------------
+        if book:
+            final_title = book["title"]
 
+        # -------------------------------
+        # NEW BOOK -> TRAIN AI DATABASE
+        # -------------------------------
+        else:
+            final_title = text
+            add_book(final_title)     # 🔥 THIS FIXES YOUR PROBLEM
+
+        # SAVE TO USER LIBRARY
         save_book_for_user(uid, final_title)
 
         return {
