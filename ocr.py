@@ -4,7 +4,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 import cv2
 import pytesseract
 import re
-from threading import Lock
+
 
 # ---------------------------------------------------
 # NORMALIZE TEXT
@@ -17,7 +17,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# IMAGE PREPROCESS (CENTER FOCUS)
+# IMAGE PREPROCESS (TITLE REGION FOCUS)
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -25,67 +25,55 @@ def preprocess(path):
     if img is None:
         return None
 
-    # resize big images (speed boost)
+    # Resize large images (huge speed boost)
     h, w = img.shape[:2]
-    scale = 900 / max(h, w)
+    scale = 1000 / max(h, w)
     if scale < 1:
         img = cv2.resize(img, None, fx=scale, fy=scale)
 
-    # crop center (book title mostly center)
+    # Focus middle 70% (title area)
     h, w = img.shape[:2]
-    crop = img[int(h*0.15):int(h*0.85), int(w*0.1):int(w*0.9)]
+    crop = img[int(h*0.15):int(h*0.80), int(w*0.08):int(w*0.92)]
 
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=10)
+    gray = cv2.convertScaleAbs(gray, alpha=1.7, beta=15)
     gray = cv2.GaussianBlur(gray,(5,5),0)
-    gray = cv2.adaptiveThreshold(gray,255,
-                                 cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                 cv2.THRESH_BINARY,31,2)
 
-    return gray
+    # adaptive threshold handles dark/light covers
+    th = cv2.adaptiveThreshold(
+        gray,255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,31,2
+    )
+
+    return th
 
 
 # ---------------------------------------------------
-# FILTER BAD LINES
+# REMOVE JUNK TEXT
 # ---------------------------------------------------
-def valid(text):
+def valid(text, conf):
+
+    if conf < 60:
+        return False
 
     if len(text) < 3:
         return False
 
-    if re.search(r'\d{10,13}', text):
+    # remove numbers (isbn/price)
+    if re.search(r'\d{3,}', text):
         return False
 
-    if re.search(r'\b(rs|inr|\$|edition|ed\.)\b', text.lower()):
+    # remove common noise words
+    bad_words = ["edition","press","publisher","volume","vol","rs","inr"]
+    if any(w in text.lower() for w in bad_words):
         return False
 
     return True
 
 
 # ---------------------------------------------------
-# SMART TITLE PICKER
-# ---------------------------------------------------
-def pick_title(lines):
-
-    candidates = []
-
-    for line in lines:
-
-        if not valid(line):
-            continue
-
-        score = len(line)  # longest meaningful line wins
-        candidates.append((line, score))
-
-    if not candidates:
-        return ""
-
-    best = max(candidates, key=lambda x: x[1])[0]
-    return normalize(best)
-
-
-# ---------------------------------------------------
-# MAIN OCR FUNCTION
+# PICK TITLE USING BIGGEST TEXT AREA
 # ---------------------------------------------------
 def extract_text(path: str) -> str:
     try:
@@ -93,14 +81,53 @@ def extract_text(path: str) -> str:
         if img is None:
             return ""
 
-        # Tesseract config tuned for book titles
-        config = r'--oem 3 --psm 6'
+        data = pytesseract.image_to_data(
+            img,
+            config="--oem 3 --psm 6",
+            output_type=pytesseract.Output.DICT
+        )
 
-        data = pytesseract.image_to_string(img, config=config)
+        candidates = []
 
-        lines = [l.strip() for l in data.split("\n") if l.strip()]
+        for i in range(len(data["text"])):
+            text = data["text"][i].strip()
+            conf = int(data["conf"][i])
 
-        title = pick_title(lines)
+            if not valid(text, conf):
+                continue
+
+            w = data["width"][i]
+            h = data["height"][i]
+
+            # KEY IDEA → title = biggest visible text
+            score = w * h * conf
+            candidates.append((text, score, data["top"][i]))
+
+        if not candidates:
+            return ""
+
+        # sort top-to-bottom, then group lines
+        candidates.sort(key=lambda x: x[2])
+
+        # combine nearby lines (multi-line titles)
+        final_lines = []
+        current_line = [candidates[0]]
+
+        for i in range(1, len(candidates)):
+            if abs(candidates[i][2] - current_line[-1][2]) < 40:
+                current_line.append(candidates[i])
+            else:
+                final_lines.append(current_line)
+                current_line = [candidates[i]]
+
+        final_lines.append(current_line)
+
+        # choose group with largest total score
+        best_group = max(final_lines, key=lambda g: sum(x[1] for x in g))
+
+        title = " ".join(x[0] for x in best_group)
+
+        title = normalize(title)
 
         print("DETECTED TITLE:", title)
         return title
