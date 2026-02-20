@@ -1,18 +1,35 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+
 from paddleocr import PaddleOCR
+import cv2
 import re
+from threading import Lock
 
 # ---------------------------------------------------
-# LOAD MODEL ONCE (VERY IMPORTANT)
+# SAFE LAZY LOAD MODEL (IMPORTANT FOR RENDER)
 # ---------------------------------------------------
-ocr = PaddleOCR(
-    use_angle_cls=True,
-    lang="en",
-    show_log=False
-)
+_ocr = None
+_lock = Lock()
+
+def get_ocr():
+    global _ocr
+    if _ocr is None:
+        with _lock:
+            if _ocr is None:
+                print("Loading OCR model...")
+                _ocr = PaddleOCR(
+                    use_angle_cls=False,   # faster
+                    lang="en",
+                    show_log=False,
+                    use_gpu=False
+                )
+                print("OCR ready")
+    return _ocr
 
 
 # ---------------------------------------------------
-# CLEAN TEXT
+# NORMALIZE TEXT
 # ---------------------------------------------------
 def normalize(text: str) -> str:
     text = text.lower()
@@ -22,21 +39,43 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# REMOVE BAD LINES
+# IMAGE PREPROCESS (VERY IMPORTANT)
 # ---------------------------------------------------
-def is_valid_line(text: str, conf: float) -> bool:
+def preprocess(path):
 
-    if conf < 0.55:
+    img = cv2.imread(path)
+
+    # resize big images (massive speed boost)
+    h, w = img.shape[:2]
+    scale = 900 / max(h, w)
+    if scale < 1:
+        img = cv2.resize(img, None, fx=scale, fy=scale)
+
+    # focus center (title usually center)
+    h, w = img.shape[:2]
+    crop = img[int(h*0.15):int(h*0.85), int(w*0.1):int(w*0.9)]
+
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=10)
+    gray = cv2.GaussianBlur(gray,(5,5),0)
+
+    return gray
+
+
+# ---------------------------------------------------
+# FILTER BAD LINES
+# ---------------------------------------------------
+def valid(text, conf):
+
+    if conf < 0.60:
         return False
 
     if len(text) < 3:
         return False
 
-    # remove isbn
     if re.search(r'\d{10,13}', text):
         return False
 
-    # remove price / edition
     if re.search(r'\b(rs|inr|\$|edition|ed\.)\b', text.lower()):
         return False
 
@@ -44,57 +83,31 @@ def is_valid_line(text: str, conf: float) -> bool:
 
 
 # ---------------------------------------------------
-# SMART TITLE GROUPING
+# SMART TITLE PICKER
 # ---------------------------------------------------
-def extract_title(detections):
+def pick_title(detections):
 
-    lines = []
+    candidates = []
 
     for det in detections:
         box = det[0]
         text = det[1][0].strip()
         conf = float(det[1][1])
 
-        if not is_valid_line(text, conf):
+        if not valid(text, conf):
             continue
 
-        y_center = (box[0][1] + box[2][1]) / 2
+        # height importance (title usually biggest)
         height = abs(box[0][1] - box[2][1])
+        score = len(text) * conf * (height + 1)
 
-        lines.append({
-            "text": text,
-            "y": y_center,
-            "h": height
-        })
+        candidates.append((text, score))
 
-    if not lines:
+    if not candidates:
         return ""
 
-    # sort vertically
-    lines.sort(key=lambda x: x["y"])
-
-    # group nearby lines → same title block
-    groups = []
-    current = [lines[0]]
-
-    for i in range(1, len(lines)):
-        prev = current[-1]
-        curr = lines[i]
-
-        if abs(curr["y"] - prev["y"]) < max(prev["h"], curr["h"]) * 1.8:
-            current.append(curr)
-        else:
-            groups.append(current)
-            current = [curr]
-
-    groups.append(current)
-
-    # choose biggest visual block (book title usually largest)
-    best_group = max(groups, key=lambda g: len(g))
-
-    title = " ".join([l["text"] for l in best_group])
-
-    return normalize(title)
+    best = max(candidates, key=lambda x: x[1])[0]
+    return normalize(best)
 
 
 # ---------------------------------------------------
@@ -102,12 +115,15 @@ def extract_title(detections):
 # ---------------------------------------------------
 def extract_text(path: str) -> str:
     try:
-        result = ocr.ocr(path)
+        img = preprocess(path)
+
+        ocr = get_ocr()
+        result = ocr.ocr(img)
 
         if not result or not result[0]:
             return ""
 
-        title = extract_title(result[0])
+        title = pick_title(result[0])
 
         print("DETECTED TITLE:", title)
         return title
