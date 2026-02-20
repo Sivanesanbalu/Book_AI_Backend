@@ -31,7 +31,7 @@ COPY requirements.txt .
 RUN pip install --upgrade pip
 
 # paddle must install before requirements in many servers
-RUN pip install paddlepaddle==2.6.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install paddlepaddle==2.6.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 RUN pip install --no-cache-dir -r requirements.txt
 
