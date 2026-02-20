@@ -2,12 +2,13 @@ import os
 import shutil
 import uuid
 import asyncio
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 
 from ocr import extract_text
 from search_engine import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
+from title_extractor import extract_title
 
 app = FastAPI()
 
@@ -29,7 +30,7 @@ def save_temp_file(upload_file: UploadFile) -> str:
 
 
 # ------------------------------------------------
-# SAFE OCR EXECUTION (non-blocking)
+# SAFE OCR EXECUTION
 # ------------------------------------------------
 async def run_ocr(path: str):
     loop = asyncio.get_event_loop()
@@ -45,41 +46,46 @@ async def scan_book(uid: str, file: UploadFile = File(...)):
     path = save_temp_file(file)
 
     try:
-        text = await run_ocr(path)
+        raw_text = await run_ocr(path)
 
-        if not text or len(text) < 3:
+        if not raw_text or len(raw_text) < 3:
+            return {"status": "no_text"}
+
+        # 🔥 EXTRACT TITLE ONLY
+        title = extract_title(raw_text)
+
+        if not title:
             return {"status": "no_text"}
 
         # -------- AI SEARCH --------
-        book, score = search_book(text)
+        book, score = search_book(title)
 
-        # -------- If Found in Global DB --------
+        # -------- FOUND IN GLOBAL DB --------
         if book:
-            title = book["title"]
+            clean_title = book["title"]
 
-            if user_has_book(uid, title):
+            if user_has_book(uid, clean_title):
                 return {
                     "status": "owned",
-                    "title": title
+                    "title": clean_title
                 }
 
             return {
                 "status": "known_book",
-                "title": title,
+                "title": clean_title,
                 "confidence": round(float(score), 3)
             }
 
         # -------- FALLBACK USER CHECK --------
-        # even if AI fails, check if user owns similar book
-        if user_has_book(uid, text):
+        if user_has_book(uid, title):
             return {
                 "status": "owned",
-                "title": text
+                "title": title
             }
 
         return {
             "status": "unknown",
-            "detected_text": text
+            "detected_title": title
         }
 
     except Exception as e:
@@ -102,22 +108,29 @@ async def capture_book(uid: str, file: UploadFile = File(...)):
     path = save_temp_file(file)
 
     try:
-        text = await run_ocr(path)
+        raw_text = await run_ocr(path)
 
-        if not text or len(text) < 3:
+        if not raw_text or len(raw_text) < 3:
             return {"status": "failed"}
 
-        book, score = search_book(text)
+        # 🔥 EXTRACT TITLE ONLY
+        title = extract_title(raw_text)
 
-        # -------- Book exists in global DB --------
+        if not title:
+            return {"status": "failed"}
+
+        book, score = search_book(title)
+
+        # -------- BOOK EXISTS --------
         if book:
             final_title = book["title"]
 
+        # -------- NEW BOOK --------
         else:
-            final_title = text
+            final_title = title
             add_book(final_title)
 
-        # -------- Prevent duplicate in user library --------
+        # -------- USER DUPLICATE CHECK --------
         if user_has_book(uid, final_title):
             return {
                 "status": "already_saved",

@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 from rapidfuzz import fuzz
 
@@ -39,14 +39,23 @@ def normalize_title(text: str) -> str:
 
 
 # ---------------------------------------------------
-# CACHE USER BOOKS (VERY IMPORTANT FOR SPEED)
+# TTL CACHE (AUTO MEMORY CONTROL)
 # ---------------------------------------------------
-_user_cache = {}
+CACHE_TTL = timedelta(minutes=5)
+_user_cache = {}  # { user_id : (titles, expire_time) }
+
 
 def load_user_books(user_id: str):
-    if user_id in _user_cache:
-        return _user_cache[user_id]
 
+    now = datetime.utcnow()
+
+    # return cache if valid
+    if user_id in _user_cache:
+        titles, expire = _user_cache[user_id]
+        if now < expire:
+            return titles
+
+    # reload from firestore
     books_ref = db.collection("users").document(user_id).collection("books").stream()
 
     titles = []
@@ -54,7 +63,9 @@ def load_user_books(user_id: str):
         data = book.to_dict()
         titles.append(data.get("title", ""))
 
-    _user_cache[user_id] = titles
+    # save with expiration
+    _user_cache[user_id] = (titles, now + CACHE_TTL)
+
     return titles
 
 
@@ -67,9 +78,7 @@ def user_has_book(user_id: str, title: str) -> bool:
     user_books = load_user_books(user_id)
 
     for saved in user_books:
-        score = fuzz.token_set_ratio(clean_title, saved)
-
-        if score > 90:
+        if fuzz.token_set_ratio(clean_title, saved) > 90:
             return True
 
     return False
@@ -94,6 +103,8 @@ def save_book_for_user(user_id: str, title: str):
         "createdAt": datetime.utcnow()
       })
 
-    # update cache instantly
+    # update cache safely
     if user_id in _user_cache:
-        _user_cache[user_id].append(clean_title)
+        titles, expire = _user_cache[user_id]
+        titles.append(clean_title)
+        _user_cache[user_id] = (titles, expire)

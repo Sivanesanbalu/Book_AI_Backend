@@ -12,15 +12,18 @@ INDEX_PATH = os.path.join(DATA_DIR, "index.faiss")
 DB_PATH = os.path.join(DATA_DIR, "books_db.json")
 
 DIM = 384
-SEMANTIC_THRESHOLD = 0.60     # FAISS meaning similarity
-STRING_THRESHOLD = 82         # title verification
+SEMANTIC_THRESHOLD = 0.60
+STRING_THRESHOLD = 82
 
 lock = Lock()
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# ---------------- GLOBAL CACHE ----------------
+_index = None
+_books_cache = None
 
-# ---------------- TEXT NORMALIZATION ---------------- #
 
+# ---------------- TEXT NORMALIZATION ----------------
 def normalize_text(text: str) -> str:
     text = text.lower()
     text = re.sub(r'[^a-z0-9 ]', '', text)
@@ -28,78 +31,76 @@ def normalize_text(text: str) -> str:
     return text
 
 
-# ---------------- VECTOR NORMALIZATION ---------------- #
-
-def normalize(vec):
-    norm = np.linalg.norm(vec, axis=1, keepdims=True)
-    norm[norm == 0] = 1
-    return vec / norm
-
-
-# ---------------- DB ---------------- #
-
+# ---------------- LOAD DATABASE ----------------
 def load_db():
+    global _books_cache
+    if _books_cache is not None:
+        return _books_cache
+
     if not os.path.exists(DB_PATH):
-        return []
+        _books_cache = []
+        return _books_cache
+
     with open(DB_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        _books_cache = json.load(f)
+
+    return _books_cache
 
 
 def save_db(data):
+    global _books_cache
+    _books_cache = data
     with open(DB_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-# ---------------- INDEX (FAST SEARCH) ---------------- #
-
-def build_hnsw():
+# ---------------- INDEX ----------------
+def build_index(books):
     index = faiss.IndexHNSWFlat(DIM, 32)
     index.hnsw.efSearch = 64
     index.hnsw.efConstruction = 40
-    return index
-
-
-def rebuild_index(books):
-    index = build_hnsw()
 
     if len(books) == 0:
-        faiss.write_index(index, INDEX_PATH)
         return index
 
     embeddings = []
-
     for b in books:
-        emb = get_embedding(b["title"]).reshape(1, -1)
-        emb = normalize(emb)
+        emb = get_embedding(b["title"])
         embeddings.append(emb)
 
     embeddings = np.vstack(embeddings)
     index.add(embeddings)
 
-    faiss.write_index(index, INDEX_PATH)
     return index
 
 
-def get_index():
+def load_index():
+    global _index
+
+    if _index is not None:
+        return _index
+
     books = load_db()
 
-    if not os.path.exists(INDEX_PATH):
-        return rebuild_index(books)
+    if os.path.exists(INDEX_PATH):
+        try:
+            _index = faiss.read_index(INDEX_PATH)
+            if _index.ntotal == len(books):
+                print("FAISS index loaded from disk")
+                return _index
+        except:
+            pass
 
-    index = faiss.read_index(INDEX_PATH)
-
-    if index.ntotal != len(books):
-        return rebuild_index(books)
-
-    return index
+    print("Rebuilding FAISS index...")
+    _index = build_index(books)
+    faiss.write_index(_index, INDEX_PATH)
+    return _index
 
 
-# ---------------- SEARCH (AI + VERIFY) ---------------- #
-
+# ---------------- SEARCH ----------------
 def search_book(text: str):
 
     text = normalize_text(text)
-
     if len(text) < 4:
         return None, 0.0
 
@@ -107,11 +108,9 @@ def search_book(text: str):
     if len(books) == 0:
         return None, 0.0
 
-    index = get_index()
+    index = load_index()
 
-    query = get_embedding(text).reshape(1, -1)
-    query = normalize(query)
-
+    query = get_embedding(text)
     D, I = index.search(query, 1)
 
     score = float(D[0][0])
@@ -120,23 +119,21 @@ def search_book(text: str):
     if idx >= len(books) or score < SEMANTIC_THRESHOLD:
         return None, score
 
-    # -------- SECOND VERIFICATION (IMPORTANT) --------
     stored_title = books[idx]["title"]
 
     string_score = fuzz.token_set_ratio(text, stored_title)
-
     if string_score < STRING_THRESHOLD:
         return None, score
 
     return books[idx], score
 
 
-# ---------------- ADD BOOK ---------------- #
-
+# ---------------- ADD BOOK ----------------
 def add_book(title: str):
 
-    title = normalize_text(title)
+    global _index
 
+    title = normalize_text(title)
     if len(title) < 4:
         return None
 
@@ -144,7 +141,6 @@ def add_book(title: str):
 
         books = load_db()
 
-        # prevent duplicates strongly
         for b in books:
             if fuzz.token_set_ratio(title, b["title"]) > 90:
                 return b
@@ -152,6 +148,10 @@ def add_book(title: str):
         books.append({"title": title})
         save_db(books)
 
-        rebuild_index(books)
+        emb = get_embedding(title)
+        index = load_index()
+        index.add(emb)
+
+        faiss.write_index(index, INDEX_PATH)
 
         return {"title": title}

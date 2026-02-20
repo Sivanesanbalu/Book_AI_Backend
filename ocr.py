@@ -1,19 +1,16 @@
 from paddleocr import PaddleOCR
 import re
+import numpy as np
 
-# ---------------------------------------------------
-# LOAD MODEL ONLY ONCE (IMPORTANT FOR PERFORMANCE)
-# ---------------------------------------------------
+# load once
 ocr = PaddleOCR(
-    use_angle_cls=True,     # handles rotated books
+    use_angle_cls=True,
     lang="en",
     show_log=False
 )
 
 
-# ---------------------------------------------------
-# CLEAN TEXT
-# ---------------------------------------------------
+# ---------------- CLEAN TEXT ----------------
 def normalize(text: str) -> str:
     text = text.lower()
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
@@ -21,49 +18,64 @@ def normalize(text: str) -> str:
     return text
 
 
-# ---------------------------------------------------
-# TITLE EXTRACTION LOGIC
-# chooses strongest visible title text
-# ---------------------------------------------------
-def extract_title(detections):
+# ---------------- GROUP TITLE LINES ----------------
+def merge_title_lines(detections):
 
-    candidates = []
+    lines = []
 
-    for line in detections:
-        text = line[1][0]
-        confidence = float(line[1][1])
+    for det in detections:
+        box = det[0]
+        text = det[1][0]
+        conf = float(det[1][1])
 
-        text = text.strip()
-
-        # ignore weak detections
-        if confidence < 0.60:
+        if conf < 0.55:
             continue
 
-        # ignore very short words
-        if len(text) < 4:
+        if len(text) < 3:
             continue
 
-        # ignore isbn / numeric lines
-        if re.search(r'\d{10,13}', text):
-            continue
+        # center Y position
+        y_center = (box[0][1] + box[2][1]) / 2
+        height = abs(box[0][1] - box[2][1])
 
-        # weighted scoring
-        weight = len(text) * confidence
-        candidates.append((text, weight))
+        lines.append({
+            "text": text.strip(),
+            "y": y_center,
+            "h": height
+        })
 
-    if not candidates:
+    if not lines:
         return ""
 
-    # best candidate = title
-    candidates.sort(key=lambda x: x[1], reverse=True)
-    best = candidates[0][0]
+    # sort vertically
+    lines.sort(key=lambda x: x["y"])
 
-    return normalize(best)
+    # group close lines (same title block)
+    groups = []
+    current = [lines[0]]
+
+    for i in range(1, len(lines)):
+        prev = current[-1]
+        curr = lines[i]
+
+        # if vertically close → same block
+        if abs(curr["y"] - prev["y"]) < max(prev["h"], curr["h"]) * 1.8:
+            current.append(curr)
+        else:
+            groups.append(current)
+            current = [curr]
+
+    groups.append(current)
+
+    # choose biggest group
+    best_group = max(groups, key=lambda g: len(g))
+
+    title = " ".join([l["text"] for l in best_group])
+
+    return normalize(title)
 
 
-# ---------------------------------------------------
-# MAIN OCR FUNCTION
-# ---------------------------------------------------
+# ---------------- MAIN OCR ----------------
 def extract_text(path: str) -> str:
     try:
         result = ocr.ocr(path)
@@ -72,10 +84,9 @@ def extract_text(path: str) -> str:
             print("OCR: nothing detected")
             return ""
 
-        title = extract_title(result[0])
+        title = merge_title_lines(result[0])
 
-        print("\nDETECTED TITLE:", title)
-
+        print("DETECTED TITLE:", title)
         return title
 
     except Exception as e:

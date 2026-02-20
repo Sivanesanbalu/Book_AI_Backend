@@ -1,35 +1,46 @@
-from sentence_transformers import SentenceTransformer
 import numpy as np
+from sentence_transformers import SentenceTransformer
+from threading import Lock
 
-# --------------------------------------------------
-# LOAD MODEL ONCE (GLOBAL SINGLETON)
-# --------------------------------------------------
 MODEL_NAME = "all-MiniLM-L6-v2"
-model = SentenceTransformer(MODEL_NAME)
+
+_model = None
+_model_lock = Lock()
 
 
-# --------------------------------------------------
-# NORMALIZE VECTOR
-# --------------------------------------------------
+# ---------------- SAFE LAZY LOAD ----------------
+def get_model():
+    global _model
+
+    if _model is None:
+        with _model_lock:
+            if _model is None:
+                print("Loading embedding model...")
+                _model = SentenceTransformer(MODEL_NAME)
+                print("Embedding model loaded")
+
+    return _model
+
+
+# ---------------- NORMALIZE ----------------
 def normalize(vec):
     norm = np.linalg.norm(vec, axis=1, keepdims=True)
     norm[norm == 0] = 1
     return vec / norm
 
 
-# --------------------------------------------------
-# GET EMBEDDING
-# --------------------------------------------------
+# ---------------- GET EMBEDDING ----------------
 def get_embedding(text: str) -> np.ndarray:
-    """
-    Converts book title text into semantic vector
-    Used by search_engine.py
-    """
 
     if not text:
         return np.zeros((1, 384), dtype="float32")
 
-    emb = model.encode([text])[0].astype("float32")
-    emb = normalize(np.array([emb]))
+    model = get_model()
+
+    emb = model.encode(
+        [text],
+        convert_to_numpy=True,
+        normalize_embeddings=True
+    ).astype("float32")
 
     return emb
