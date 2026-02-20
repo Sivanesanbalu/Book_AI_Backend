@@ -9,11 +9,12 @@ pytesseract==0.3.10
 opencv-python-headless==4.9.0.80
 Pillow==10.3.0
 
-# Semantic search (light optimized)
+# Semantic search (stable versions for Render RAM)
 faiss-cpu==1.7.4
 sentence-transformers==2.6.1
 torch==2.2.2
 numpy==1.26.4
+scikit-learn==1.4.2
 
 # String similarity
 rapidfuzz==3.9.3
