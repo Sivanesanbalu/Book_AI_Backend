@@ -3,9 +3,12 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # -------------------------------------------------
-# SYSTEM DEPENDENCIES (opencv + tesseract)
+# SYSTEM DEPENDENCIES
 # -------------------------------------------------
 RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    libtesseract-dev \
+    libleptonica-dev \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
@@ -15,8 +18,6 @@ RUN apt-get update && apt-get install -y \
     gcc \
     build-essential \
     curl \
-    tesseract-ocr \
-    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
@@ -34,5 +35,5 @@ COPY . .
 
 RUN mkdir -p uploads data
 
-# -------------------------------------------------
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]

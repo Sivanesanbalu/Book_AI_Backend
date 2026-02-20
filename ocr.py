@@ -1,8 +1,9 @@
 from paddleocr import PaddleOCR
 import re
-import numpy as np
 
-# load once
+# ---------------------------------------------------
+# LOAD MODEL ONCE (VERY IMPORTANT)
+# ---------------------------------------------------
 ocr = PaddleOCR(
     use_angle_cls=True,
     lang="en",
@@ -10,7 +11,9 @@ ocr = PaddleOCR(
 )
 
 
-# ---------------- CLEAN TEXT ----------------
+# ---------------------------------------------------
+# CLEAN TEXT
+# ---------------------------------------------------
 def normalize(text: str) -> str:
     text = text.lower()
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
@@ -18,28 +21,48 @@ def normalize(text: str) -> str:
     return text
 
 
-# ---------------- GROUP TITLE LINES ----------------
-def merge_title_lines(detections):
+# ---------------------------------------------------
+# REMOVE BAD LINES
+# ---------------------------------------------------
+def is_valid_line(text: str, conf: float) -> bool:
+
+    if conf < 0.55:
+        return False
+
+    if len(text) < 3:
+        return False
+
+    # remove isbn
+    if re.search(r'\d{10,13}', text):
+        return False
+
+    # remove price / edition
+    if re.search(r'\b(rs|inr|\$|edition|ed\.)\b', text.lower()):
+        return False
+
+    return True
+
+
+# ---------------------------------------------------
+# SMART TITLE GROUPING
+# ---------------------------------------------------
+def extract_title(detections):
 
     lines = []
 
     for det in detections:
         box = det[0]
-        text = det[1][0]
+        text = det[1][0].strip()
         conf = float(det[1][1])
 
-        if conf < 0.55:
+        if not is_valid_line(text, conf):
             continue
 
-        if len(text) < 3:
-            continue
-
-        # center Y position
         y_center = (box[0][1] + box[2][1]) / 2
         height = abs(box[0][1] - box[2][1])
 
         lines.append({
-            "text": text.strip(),
+            "text": text,
             "y": y_center,
             "h": height
         })
@@ -50,7 +73,7 @@ def merge_title_lines(detections):
     # sort vertically
     lines.sort(key=lambda x: x["y"])
 
-    # group close lines (same title block)
+    # group nearby lines → same title block
     groups = []
     current = [lines[0]]
 
@@ -58,7 +81,6 @@ def merge_title_lines(detections):
         prev = current[-1]
         curr = lines[i]
 
-        # if vertically close → same block
         if abs(curr["y"] - prev["y"]) < max(prev["h"], curr["h"]) * 1.8:
             current.append(curr)
         else:
@@ -67,7 +89,7 @@ def merge_title_lines(detections):
 
     groups.append(current)
 
-    # choose biggest group
+    # choose biggest visual block (book title usually largest)
     best_group = max(groups, key=lambda g: len(g))
 
     title = " ".join([l["text"] for l in best_group])
@@ -75,16 +97,17 @@ def merge_title_lines(detections):
     return normalize(title)
 
 
-# ---------------- MAIN OCR ----------------
+# ---------------------------------------------------
+# MAIN OCR FUNCTION
+# ---------------------------------------------------
 def extract_text(path: str) -> str:
     try:
         result = ocr.ocr(path)
 
         if not result or not result[0]:
-            print("OCR: nothing detected")
             return ""
 
-        title = merge_title_lines(result[0])
+        title = extract_title(result[0])
 
         print("DETECTED TITLE:", title)
         return title

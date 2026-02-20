@@ -2,13 +2,12 @@ import os
 import shutil
 import uuid
 import asyncio
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
 
 from ocr import extract_text
 from search_engine import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
-from title_extractor import extract_title
 
 app = FastAPI()
 
@@ -30,7 +29,7 @@ def save_temp_file(upload_file: UploadFile) -> str:
 
 
 # ------------------------------------------------
-# SAFE OCR EXECUTION
+# NON BLOCKING OCR
 # ------------------------------------------------
 async def run_ocr(path: str):
     loop = asyncio.get_event_loop()
@@ -41,26 +40,19 @@ async def run_ocr(path: str):
 # 🔎 SCAN — ONLY CHECK
 ############################################################
 @app.post("/scan")
-async def scan_book(uid: str, file: UploadFile = File(...)):
+async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
 
     path = save_temp_file(file)
 
     try:
-        raw_text = await run_ocr(path)
+        title = await run_ocr(path)
 
-        if not raw_text or len(raw_text) < 3:
+        if not title or len(title) < 4:
             return {"status": "no_text"}
 
-        # 🔥 EXTRACT TITLE ONLY
-        title = extract_title(raw_text)
-
-        if not title:
-            return {"status": "no_text"}
-
-        # -------- AI SEARCH --------
         book, score = search_book(title)
 
-        # -------- FOUND IN GLOBAL DB --------
+        # GLOBAL BOOK FOUND
         if book:
             clean_title = book["title"]
 
@@ -76,7 +68,7 @@ async def scan_book(uid: str, file: UploadFile = File(...)):
                 "confidence": round(float(score), 3)
             }
 
-        # -------- FALLBACK USER CHECK --------
+        # USER FALLBACK CHECK
         if user_has_book(uid, title):
             return {
                 "status": "owned",
@@ -89,10 +81,7 @@ async def scan_book(uid: str, file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
     finally:
         if os.path.exists(path):
@@ -100,37 +89,28 @@ async def scan_book(uid: str, file: UploadFile = File(...)):
 
 
 ############################################################
-# 📸 CAPTURE — SAVE BOOK + TRAIN AI
+# 📸 CAPTURE — SAVE BOOK
 ############################################################
 @app.post("/capture")
-async def capture_book(uid: str, file: UploadFile = File(...)):
+async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
 
     path = save_temp_file(file)
 
     try:
-        raw_text = await run_ocr(path)
+        title = await run_ocr(path)
 
-        if not raw_text or len(raw_text) < 3:
-            return {"status": "failed"}
-
-        # 🔥 EXTRACT TITLE ONLY
-        title = extract_title(raw_text)
-
-        if not title:
+        if not title or len(title) < 4:
             return {"status": "failed"}
 
         book, score = search_book(title)
 
-        # -------- BOOK EXISTS --------
+        # BOOK ALREADY KNOWN
         if book:
             final_title = book["title"]
-
-        # -------- NEW BOOK --------
         else:
             final_title = title
             add_book(final_title)
 
-        # -------- USER DUPLICATE CHECK --------
         if user_has_book(uid, final_title):
             return {
                 "status": "already_saved",
@@ -145,10 +125,7 @@ async def capture_book(uid: str, file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
     finally:
         if os.path.exists(path):
