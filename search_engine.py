@@ -5,13 +5,15 @@ import numpy as np
 from embedder import get_embedding
 from threading import Lock
 import re
+from rapidfuzz import fuzz
 
 DATA_DIR = "data"
 INDEX_PATH = os.path.join(DATA_DIR, "index.faiss")
 DB_PATH = os.path.join(DATA_DIR, "books_db.json")
 
 DIM = 384
-SIMILARITY_THRESHOLD = 0.68   # tuned for OCR noise
+SEMANTIC_THRESHOLD = 0.60     # FAISS meaning similarity
+STRING_THRESHOLD = 82         # title verification
 
 lock = Lock()
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -48,10 +50,17 @@ def save_db(data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-# ---------------- INDEX ---------------- #
+# ---------------- INDEX (FAST SEARCH) ---------------- #
+
+def build_hnsw():
+    index = faiss.IndexHNSWFlat(DIM, 32)
+    index.hnsw.efSearch = 64
+    index.hnsw.efConstruction = 40
+    return index
+
 
 def rebuild_index(books):
-    index = faiss.IndexFlatIP(DIM)
+    index = build_hnsw()
 
     if len(books) == 0:
         faiss.write_index(index, INDEX_PATH)
@@ -85,13 +94,12 @@ def get_index():
     return index
 
 
-# ---------------- SEARCH ---------------- #
+# ---------------- SEARCH (AI + VERIFY) ---------------- #
 
 def search_book(text: str):
 
     text = normalize_text(text)
 
-    # ignore garbage OCR
     if len(text) < 4:
         return None, 0.0
 
@@ -109,10 +117,18 @@ def search_book(text: str):
     score = float(D[0][0])
     idx = int(I[0][0])
 
-    if idx < len(books) and score >= SIMILARITY_THRESHOLD:
-        return books[idx], score
+    if idx >= len(books) or score < SEMANTIC_THRESHOLD:
+        return None, score
 
-    return None, score
+    # -------- SECOND VERIFICATION (IMPORTANT) --------
+    stored_title = books[idx]["title"]
+
+    string_score = fuzz.token_set_ratio(text, stored_title)
+
+    if string_score < STRING_THRESHOLD:
+        return None, score
+
+    return books[idx], score
 
 
 # ---------------- ADD BOOK ---------------- #
@@ -128,9 +144,9 @@ def add_book(title: str):
 
         books = load_db()
 
-        # duplicate prevention
+        # prevent duplicates strongly
         for b in books:
-            if title == b["title"]:
+            if fuzz.token_set_ratio(title, b["title"]) > 90:
                 return b
 
         books.append({"title": title})
@@ -139,4 +155,3 @@ def add_book(title: str):
         rebuild_index(books)
 
         return {"title": title}
-

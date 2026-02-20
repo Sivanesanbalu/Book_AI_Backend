@@ -4,12 +4,20 @@ firebase-admin==6.5.0
 python-multipart==0.0.9
 pydantic==2.7.1
 
-pytesseract==0.3.10
+# Image processing
 opencv-python-headless==4.9.0.80
 Pillow==10.3.0
 
+# AI OCR (NEW)
+paddleocr==2.7.3
+paddlepaddle==2.6.2
+
+# Semantic search
 faiss-cpu==1.7.4
 sentence-transformers==2.6.1
 torch==2.2.2
 numpy==1.26.4
 scikit-learn==1.4.2
+
+# String similarity (NEW)
+rapidfuzz==3.9.3

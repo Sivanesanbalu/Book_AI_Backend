@@ -1,155 +1,82 @@
-import pytesseract
-import cv2
-import numpy as np
-import os
+from paddleocr import PaddleOCR
 import re
-import shutil
 
-############################################################
-# AUTO DETECT TESSERACT (Windows + Linux + Docker + Render)
-############################################################
-tesseract_path = shutil.which("tesseract")
-
-if tesseract_path:
-    pytesseract.pytesseract.tesseract_cmd = tesseract_path
-else:
-    print("WARNING: Tesseract not found in PATH")
+# ---------------------------------------------------
+# LOAD MODEL ONLY ONCE (IMPORTANT FOR PERFORMANCE)
+# ---------------------------------------------------
+ocr = PaddleOCR(
+    use_angle_cls=True,     # handles rotated books
+    lang="en",
+    show_log=False
+)
 
 
-############################################################
-# AUTO ROTATE (fix tilted book)
-############################################################
-def correct_rotation(image):
-
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    coords = np.column_stack(np.where(gray > 0))
-
-    if len(coords) < 100:
-        return image
-
-    angle = cv2.minAreaRect(coords)[-1]
-
-    if angle < -45:
-        angle = 90 + angle
-
-    (h, w) = image.shape[:2]
-    center = (w // 2, h // 2)
-
-    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    return cv2.warpAffine(
-        image, M, (w, h),
-        flags=cv2.INTER_CUBIC,
-        borderMode=cv2.BORDER_REPLICATE
-    )
-
-
-############################################################
-# IMAGE PREPROCESSING
-############################################################
-def preprocess(image):
-
-    image = correct_rotation(image)
-
-    # upscale improves OCR heavily
-    image = cv2.resize(image, None, fx=1.7, fy=1.7, interpolation=cv2.INTER_CUBIC)
-
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    blur = cv2.GaussianBlur(gray, (5,5), 0)
-
-    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    return thresh
-
-
-############################################################
-# OCR ERROR NORMALIZATION
-############################################################
-COMMON_OCR_FIX = {
-    "0": "o",
-    "1": "i",
-    "5": "s",
-    "8": "b",
-    "|": "i",
-}
-
-
-def normalize_ocr_errors(text: str):
-    for k, v in COMMON_OCR_FIX.items():
-        text = text.replace(k, v)
+# ---------------------------------------------------
+# CLEAN TEXT
+# ---------------------------------------------------
+def normalize(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9 ]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
-############################################################
-# TEXT CLEANING — STABLE TITLE EXTRACTION
-############################################################
-def clean_text(text: str):
+# ---------------------------------------------------
+# TITLE EXTRACTION LOGIC
+# chooses strongest visible title text
+# ---------------------------------------------------
+def extract_title(detections):
 
-    lines = text.split("\n")
     candidates = []
 
-    for line in lines:
-        line = line.strip()
+    for line in detections:
+        text = line[1][0]
+        confidence = float(line[1][1])
 
-        if len(line) < 4:
+        text = text.strip()
+
+        # ignore weak detections
+        if confidence < 0.60:
             continue
 
-        # remove symbols
-        line = re.sub(r'[^A-Za-z0-9 ]', '', line)
-
-        # remove extra spaces
-        line = re.sub(r'\s+', ' ', line)
-
-        # fix OCR mistakes
-        line = normalize_ocr_errors(line)
-
-        # ignore ISBN / numeric heavy
-        alpha_ratio = sum(c.isalpha() for c in line) / max(len(line),1)
-        if alpha_ratio < 0.55:
+        # ignore very short words
+        if len(text) < 4:
             continue
 
-        candidates.append(line)
+        # ignore isbn / numeric lines
+        if re.search(r'\d{10,13}', text):
+            continue
+
+        # weighted scoring
+        weight = len(text) * confidence
+        candidates.append((text, weight))
 
     if not candidates:
         return ""
 
-    # longest meaningful line = title
-    candidates.sort(key=len, reverse=True)
-    title = candidates[0]
+    # best candidate = title
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    best = candidates[0][0]
 
-    # remove noisy words
-    stop_words = ["by", "author", "edition", "press", "publication"]
-    words = [w for w in title.split() if w.lower() not in stop_words]
-
-    final = " ".join(words).lower()
-
-    return final.strip()
+    return normalize(best)
 
 
-############################################################
-# MAIN OCR
-############################################################
+# ---------------------------------------------------
+# MAIN OCR FUNCTION
+# ---------------------------------------------------
 def extract_text(path: str) -> str:
-
     try:
-        image = cv2.imread(path)
+        result = ocr.ocr(path)
 
-        if image is None:
-            print("OCR ERROR: image not loaded")
+        if not result or not result[0]:
+            print("OCR: nothing detected")
             return ""
 
-        processed = preprocess(image)
+        title = extract_title(result[0])
 
-        raw_text = pytesseract.image_to_string(
-            processed,
-            config="--oem 3 --psm 6 -l eng"
-        )
+        print("\nDETECTED TITLE:", title)
 
-        final_text = clean_text(raw_text)
-
-        print("\nOCR DETECTED:", final_text)
-
-        return final_text
+        return title
 
     except Exception as e:
         print("OCR FAILED:", e)
