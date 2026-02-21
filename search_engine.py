@@ -1,192 +1,123 @@
+
 import os
-os.environ["OMP_NUM_THREADS"] = "1"
+import json
+import faiss
+import numpy as np
+from threading import Lock
 
-import cv2
-import pytesseract
-import re
-from collections import Counter
+from embedding import get_embedding, clean_text   # 🔥 IMPORTANT
 
-# ---------------------------------------------------
-# NORMALIZE TEXT
-# ---------------------------------------------------
-def normalize(text: str) -> str:
-    text = text.lower()
-    text = re.sub(r'[^a-z0-9 ]', ' ', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
+DATA_FILE = "data/books.json"
+INDEX_FILE = "data/books.faiss"
 
+os.makedirs("data", exist_ok=True)
 
-# ---------------------------------------------------
-# AUTO ROTATE (critical for book spines)
-# ---------------------------------------------------
-def auto_rotate(img):
-
-    try:
-        osd = pytesseract.image_to_osd(img)
-        angle = int(re.search('Rotate: (\d+)', osd).group(1))
-
-        if angle == 90:
-            img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        elif angle == 180:
-            img = cv2.rotate(img, cv2.ROTATE_180)
-        elif angle == 270:
-            img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-
-    except:
-        pass
-
-    return img
+# ---------------- GLOBAL CACHE ----------------
+_books_cache = []
+_index = None
+_lock = Lock()
 
 
-# ---------------------------------------------------
-# MULTI PREPROCESS
-# ---------------------------------------------------
-def preprocess_versions(path):
+# ---------------- LOAD DB ----------------
+def load_books():
+    global _books_cache
 
-    img = cv2.imread(path)
-    if img is None:
+    if not os.path.exists(DATA_FILE):
+        _books_cache = []
         return []
 
-    img = auto_rotate(img)
+    with open(DATA_FILE, "r", encoding="utf8") as f:
+        _books_cache = json.load(f)
 
-    h, w = img.shape[:2]
-    crop = img[int(h*0.10):int(h*0.75), int(w*0.10):int(w*0.90)]
-
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-
-    versions = []
-
-    # normal
-    versions.append(gray)
-
-    # sharpen
-    versions.append(cv2.convertScaleAbs(gray, alpha=1.8, beta=20))
-
-    # threshold
-    versions.append(cv2.adaptiveThreshold(
-        gray,255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,31,2
-    ))
-
-    # inverted (very important for dark covers)
-    versions.append(cv2.bitwise_not(gray))
-
-    return versions
+    return _books_cache
 
 
-# ---------------------------------------------------
-# VALID TEXT FILTER
-# ---------------------------------------------------
-def is_valid_candidate(text):
-
-    if len(text) < 4:
-        return False
-
-    if sum(c.isdigit() for c in text) > len(text)*0.4:
-        return False
-
-    bad = ["edition","press","publisher","isbn","volume","vol","rs","inr"]
-    if any(w in text for w in bad):
-        return False
-
-    if len(text.split()) < 2:
-        return False
-
-    return True
+def save_books(books):
+    with open(DATA_FILE, "w", encoding="utf8") as f:
+        json.dump(books, f, indent=2)
 
 
-# ---------------------------------------------------
-# EXTRACT TEXT LINES
-# ---------------------------------------------------
-def extract_candidates(img):
+# ---------------- BUILD INDEX ----------------
+def build_index():
 
-    data = pytesseract.image_to_data(
-        img,
-        config="--oem 3 --psm 6",
-        output_type=pytesseract.Output.DICT
-    )
+    global _index
 
-    lines = {}
+    books = load_books()
 
-    for i, word in enumerate(data["text"]):
+    if not books:
+        _index = None
+        return None
 
-        word = word.strip()
-        if not word:
-            continue
+    vectors = []
+    for b in books:
+        vec = get_embedding(b["title"])
+        vectors.append(vec[0])
 
-        conf = int(data["conf"][i])
-        if conf < 55:
-            continue
+    emb = np.array(vectors).astype("float32")
 
-        line_num = data["line_num"][i]
-        lines.setdefault(line_num, []).append(word)
+    _index = faiss.IndexFlatIP(384)
+    _index.add(emb)
 
-    results = []
+    faiss.write_index(_index, INDEX_FILE)
 
-    for line in lines.values():
-        text = normalize(" ".join(line))
-        if is_valid_candidate(text):
-            results.append(text)
+    print("📚 FAISS index rebuilt:", len(vectors), "books")
 
-    return results
+    return _index
 
 
-# ---------------------------------------------------
-# MERGE SIMILAR TITLES
-# ---------------------------------------------------
-def merge_similar(texts):
+def load_index():
+    global _index
 
-    merged = []
+    if os.path.exists(INDEX_FILE):
+        _index = faiss.read_index(INDEX_FILE)
+    else:
+        build_index()
 
-    for t in texts:
-        added = False
-        for i, m in enumerate(merged):
-            if t in m or m in t:
-                merged[i] = max(t, m, key=len)
-                added = True
-                break
-        if not added:
-            merged.append(t)
-
-    return merged
+    return _index
 
 
-# ---------------------------------------------------
-# MAIN OCR
-# ---------------------------------------------------
-def extract_text(path: str):
+# load once
+load_books()
+load_index()
 
-    try:
-        versions = preprocess_versions(path)
 
-        all_candidates = []
+# ---------------- SEARCH ----------------
+def search_book(text):
 
-        for img in versions:
-            all_candidates.extend(extract_candidates(img))
+    global _index, _books_cache
 
-        if not all_candidates:
-            print("OCR: nothing detected")
-            return []
+    if _index is None or not _books_cache:
+        return None, 0
 
-        # vote
-        vote = Counter(all_candidates)
+    text = clean_text(text)
+    emb = get_embedding(text)
 
-        # sort by frequency + length
-        ranked = sorted(
-            vote.items(),
-            key=lambda x: (x[1], len(x[0])),
-            reverse=True
-        )
+    D, I = _index.search(emb, 1)
 
-        candidates = [t[0] for t in ranked[:8]]
+    score = float(D[0][0])
+    idx = int(I[0][0])
 
-        candidates = merge_similar(candidates)
+    # tuned threshold (very important)
+    if score < 0.45:
+        return None, score
 
-        print("OCR FINAL CANDIDATES:", candidates)
+    return _books_cache[idx], score
 
-        return candidates
 
-    except Exception as e:
-        print("OCR FAILED:", e)
-        return []
+# ---------------- ADD BOOK ----------------
+def add_book(title):
+
+    global _books_cache
+
+    title = clean_text(title)
+
+    for b in _books_cache:
+        if clean_text(b["title"]) == title:
+            return
+
+    _books_cache.append({"title": title})
+    save_books(_books_cache)
+
+    build_index()
+
+    print("➕ Added book:", title)

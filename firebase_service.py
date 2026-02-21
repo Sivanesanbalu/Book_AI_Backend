@@ -1,11 +1,10 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
-import os
-import json
+import os, json, re, hashlib
 from datetime import datetime, timedelta
-import re
 from rapidfuzz import fuzz
 from threading import Lock
+from collections import OrderedDict
 
 # ---------------------------------------------------
 # INIT FIREBASE
@@ -17,11 +16,7 @@ if not firebase_admin._apps:
     if firebase_key:
         cred_dict = json.loads(firebase_key)
     else:
-        key_file = "serviceAccountKey.json"
-        if not os.path.exists(key_file):
-            raise Exception("Firebase key missing")
-
-        with open(key_file, "r") as f:
+        with open("serviceAccountKey.json") as f:
             cred_dict = json.load(f)
 
     cred = credentials.Certificate(cred_dict)
@@ -31,21 +26,47 @@ db = firestore.client()
 
 
 # ---------------------------------------------------
-# NORMALIZE TITLE
+# SMART NORMALIZATION (OCR HARDENED)
 # ---------------------------------------------------
 def normalize_title(text: str) -> str:
     text = text.lower()
+
+    fixes = {
+        "machne":"machine",
+        "lernng":"learning",
+        "inteligence":"intelligence",
+        "artifcial":"artificial",
+        "pyth0n":"python",
+        "alg0rithm":"algorithm",
+        "databse":"database"
+    }
+    for w,c in fixes.items():
+        text = text.replace(w,c)
+
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
 # ---------------------------------------------------
-# TTL CACHE (SET BASED = FAST)
+# FINGERPRINT ID (KEY FIX 🔥)
+# Same book -> same id even with OCR mistakes
+# ---------------------------------------------------
+def book_fingerprint(title: str) -> str:
+
+    words = normalize_title(title).split()
+    words = sorted(set(words))[:6]   # stable tokens
+
+    key = " ".join(words)
+    return hashlib.md5(key.encode()).hexdigest()
+
+
+# ---------------------------------------------------
+# LRU TTL CACHE
 # ---------------------------------------------------
 CACHE_TTL = timedelta(minutes=5)
-CACHE_LIMIT = 500
-_user_cache = {}
+CACHE_LIMIT = 200
+_user_cache = OrderedDict()
 cache_lock = Lock()
 
 
@@ -54,99 +75,74 @@ def load_user_books(user_id: str):
     now = datetime.utcnow()
 
     with cache_lock:
-
         if user_id in _user_cache:
             titles, expire = _user_cache[user_id]
             if now < expire:
+                _user_cache.move_to_end(user_id)
                 return titles
 
-        docs = db.collection("users").document(user_id).collection("books").stream()
+    docs = db.collection("users").document(user_id).collection("books").stream()
 
-        titles = set()
+    titles = set(doc.to_dict()["title"] for doc in docs)
 
-        for doc in docs:
-            data = doc.to_dict()
-            title = normalize_title(data.get("title", ""))
-            if title:
-                titles.add(title)
-
-        if len(_user_cache) > CACHE_LIMIT:
-            _user_cache.clear()
-
+    with cache_lock:
         _user_cache[user_id] = (titles, now + CACHE_TTL)
 
-        return titles
+        if len(_user_cache) > CACHE_LIMIT:
+            _user_cache.popitem(last=False)
+
+    return titles
 
 
 # ---------------------------------------------------
-# MATCHING (OCR FRIENDLY)
+# SIMILARITY
 # ---------------------------------------------------
-def is_similar(a: str, b: str) -> bool:
-
-    # fast length reject
-    if abs(len(a) - len(b)) > 12:
+def is_similar(a,b):
+    if abs(len(a)-len(b)) > 12:
         return False
-
-    score1 = fuzz.token_set_ratio(a, b)
-    score2 = fuzz.partial_ratio(a, b)
-
-    return max(score1, score2) >= 85
-
-
-def user_has_book(user_id: str, title: str) -> bool:
-
-    clean_title = normalize_title(title)
-    user_books = load_user_books(user_id)
-
-    if clean_title in user_books:
-        return True
-
-    for saved in user_books:
-        if is_similar(clean_title, saved):
-            return True
-
-    return False
+    return max(
+        fuzz.token_set_ratio(a,b),
+        fuzz.partial_ratio(a,b)
+    ) >= 86
 
 
 # ---------------------------------------------------
-# ATOMIC SAVE (NO DUPLICATES EVER)
+# ATOMIC SAVE (FINAL FIXED VERSION)
 # ---------------------------------------------------
 def save_book_for_user(user_id: str, title: str):
 
-    clean_title = normalize_title(title)
+    clean = normalize_title(title)
+    fingerprint = book_fingerprint(clean)
 
     user_ref = db.collection("users").document(user_id)
-    books_ref = user_ref.collection("books")
+    doc_ref = user_ref.collection("books").document(fingerprint)
 
-    # deterministic doc id prevents duplicates
-    doc_id = clean_title.replace(" ", "_")[:120]
-    doc_ref = books_ref.document(doc_id)
-
-    # transaction = atomic
     @firestore.transactional
     def txn(transaction):
 
-        snapshot = doc_ref.get(transaction=transaction)
-        if snapshot.exists:
+        # exact duplicate
+        if doc_ref.get(transaction=transaction).exists:
             return False
 
-        transaction.set(doc_ref, {
-            "title": clean_title,
-            "original_title": title,
+        # fuzzy duplicate protection
+        docs = user_ref.collection("books").stream()
+        for d in docs:
+            saved = d.to_dict()["title"]
+            if is_similar(clean, saved):
+                return False
+
+        transaction.set(doc_ref,{
+            "title": clean,
+            "original": title,
             "createdAt": datetime.utcnow()
         })
-
         return True
 
-    transaction = db.transaction()
-    created = txn(transaction)
+    created = txn(db.transaction())
 
-    # update cache safely
     if created:
         with cache_lock:
             if user_id in _user_cache:
-                titles, expire = _user_cache[user_id]
-                titles.add(clean_title)
-                _user_cache[user_id] = (titles, expire)
+                _user_cache[user_id][0].add(clean)
 
     return created

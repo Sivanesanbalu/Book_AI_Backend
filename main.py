@@ -60,7 +60,7 @@ def best_match_from_candidates(candidates):
 
 
 ############################################################
-# 🔎 SCAN — ONLY CHECK
+# 🔎 SCAN — DETECT ONLY (NO SAVE)
 ############################################################
 @app.post("/scan")
 async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -70,12 +70,13 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
     try:
         titles = await run_ocr(path)
 
+        # 1️⃣ NO TEXT FOUND
         if not titles:
             return {"status": "no_text"}
 
         book, score, detected = best_match_from_candidates(titles)
 
-        # GLOBAL BOOK FOUND
+        # 2️⃣ FOUND IN GLOBAL DATABASE
         if book:
             clean_title = book["title"]
 
@@ -91,18 +92,24 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
                 "confidence": round(float(score), 3)
             }
 
-        # USER FALLBACK CHECK
-        if detected and user_has_book(uid, detected):
+        # 3️⃣ OCR WORKED BUT BOOK NOT IN DATABASE ⭐ IMPORTANT
+        if detected:
+
+            if user_has_book(uid, detected):
+                return {
+                    "status": "owned",
+                    "title": detected
+                }
+
             return {
-                "status": "owned",
-                "title": detected
+                "status": "detected",
+                "title": detected,
+                "confidence": round(float(score), 3),
+                "note": "New book (not in database)"
             }
 
-        return {
-            "status": "unknown",
-            "detected_title": detected,
-            "candidates": titles
-        }
+        # fallback safety
+        return {"status": "no_text"}
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -128,9 +135,11 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
 
         book, score, detected = best_match_from_candidates(titles)
 
-        # BOOK ALREADY KNOWN IN GLOBAL DB
+        # GLOBAL BOOK EXISTS
         if book:
             final_title = book["title"]
+
+        # NEW BOOK → ADD TO GLOBAL DB
         else:
             final_title = detected
             if final_title:
@@ -139,12 +148,14 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
         if not final_title:
             return {"status": "failed"}
 
+        # ALREADY SAVED BY USER
         if user_has_book(uid, final_title):
             return {
                 "status": "already_saved",
                 "title": final_title
             }
 
+        # SAVE FOR USER
         save_book_for_user(uid, final_title)
 
         return {

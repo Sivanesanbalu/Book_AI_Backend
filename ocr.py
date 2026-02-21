@@ -3,6 +3,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 import cv2
 import pytesseract
+import numpy as np
 import re
 
 
@@ -17,7 +18,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# IMAGE PREPROCESS
+# IMAGE PREPROCESS (BOOK COVER OPTIMIZED)
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -25,60 +26,65 @@ def preprocess(path):
     if img is None:
         return None
 
-    # resize large images
+    # resize (consistent OCR scale)
     h, w = img.shape[:2]
-    scale = 1000 / max(h, w)
+    scale = 1200 / max(h, w)
     if scale < 1:
         img = cv2.resize(img, None, fx=scale, fy=scale)
 
-    # focus title zone (top-middle)
+    # crop center region (titles usually center-top)
     h, w = img.shape[:2]
-    crop = img[int(h*0.10):int(h*0.70), int(w*0.10):int(w*0.90)]
+    crop = img[int(h*0.05):int(h*0.75), int(w*0.05):int(w*0.95)]
 
+    # grayscale
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    gray = cv2.convertScaleAbs(gray, alpha=1.6, beta=12)
-    gray = cv2.GaussianBlur(gray,(5,5),0)
 
-    th = cv2.adaptiveThreshold(
-        gray,255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,31,2
-    )
+    # CLAHE improves printed fonts
+    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8,8))
+    gray = clahe.apply(gray)
 
-    return th
+    # light sharpening (keeps stylish fonts)
+    kernel = np.array([[0,-1,0],[-1,5,-1],[0,-1,0]])
+    sharp = cv2.filter2D(gray, -1, kernel)
+
+    return sharp
 
 
 # ---------------------------------------------------
-# TEXT FILTER
+# FILTER NON-TITLE WORDS
 # ---------------------------------------------------
 def is_bad_text(text):
 
     text_low = text.lower()
 
+    # too many numbers
     if sum(c.isdigit() for c in text) > len(text) * 0.4:
         return True
 
+    # long numeric sequences (ISBN etc)
     if re.search(r'\d{4,}', text):
         return True
 
-    bad = ["edition","press","publisher","volume","vol","rs","inr","isbn"]
+    # publisher words
+    bad = ["edition","press","publisher","volume","vol","rs","inr","isbn","copyright"]
     if any(w in text_low for w in bad):
         return True
 
-    if len(text) < 3:
+    if len(text) < 2:
         return True
 
     return False
 
 
 # ---------------------------------------------------
-# GROUP WORDS INTO LINES
+# GROUP WORDS INTO LINES (DYNAMIC THRESHOLD)
 # ---------------------------------------------------
-def group_lines(data):
+def group_lines(data, img_height):
 
     words = []
 
     for i in range(len(data["text"])):
+
         txt = data["text"][i].strip()
         conf = int(data["conf"][i])
 
@@ -101,7 +107,8 @@ def group_lines(data):
     current = [words[0]]
 
     for w in words[1:]:
-        if abs(w[2] - current[-1][2]) < 35:
+
+        if abs(w[2] - current[-1][2]) < img_height * 0.04:
             current.append(w)
         else:
             lines.append(current)
@@ -112,7 +119,7 @@ def group_lines(data):
 
 
 # ---------------------------------------------------
-# PICK MULTIPLE TITLES (MAIN FIX)
+# PICK BEST TITLE CANDIDATES
 # ---------------------------------------------------
 def pick_titles(lines, img_height):
 
@@ -124,14 +131,17 @@ def pick_titles(lines, img_height):
         text = normalize(text)
 
         word_count = len(text.split())
-        if word_count < 2:
+        if word_count < 1:
             continue
 
+        # bigger text = title
         area = sum(w[3]*w[4] for w in line)
 
+        # higher position = title
         avg_y = sum(w[2] for w in line)/len(line)
         position_score = 1 - (avg_y/img_height)
 
+        # longer title bonus
         length_bonus = min(word_count / 5, 2)
 
         score = area * (1.2 + position_score + length_bonus)
@@ -155,9 +165,10 @@ def pick_titles(lines, img_height):
 
 
 # ---------------------------------------------------
-# MAIN OCR
+# MAIN OCR FUNCTION
 # ---------------------------------------------------
 def extract_text(path: str) -> list[str]:
+
     try:
         img = preprocess(path)
         if img is None:
@@ -167,12 +178,11 @@ def extract_text(path: str) -> list[str]:
 
         data = pytesseract.image_to_data(
             img,
-            config="--oem 3 --psm 6",
+            config="--oem 3 --psm 11 -l eng",
             output_type=pytesseract.Output.DICT
         )
 
-        lines = group_lines(data)
-
+        lines = group_lines(data, h)
         titles = pick_titles(lines, h)
 
         print("OCR CANDIDATES:", titles)

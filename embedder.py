@@ -1,3 +1,4 @@
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from threading import Lock
@@ -21,7 +22,7 @@ def clean_text(text: str) -> str:
 
     text = text.lower()
 
-    # common OCR mistakes (expandable dictionary)
+    # common OCR mistakes
     fixes = {
         "systern":"system",
         "cornputer":"computer",
@@ -39,11 +40,11 @@ def clean_text(text: str) -> str:
     for wrong, correct in fixes.items():
         text = text.replace(wrong, correct)
 
-    # remove punctuation garbage
+    # remove symbols
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
 
-    # remove meaningless tokens
+    # remove useless publishing words
     stop_words = {
         "edition","third","fourth","fifth","sixth","seventh",
         "international","student","version","volume",
@@ -67,7 +68,7 @@ def get_model():
             if _model is None:
                 print("🔄 Loading embedding model...")
 
-                torch.set_num_threads(1)  # CRITICAL for CPU stability
+                torch.set_num_threads(1)
 
                 _model = SentenceTransformer(
                     MODEL_NAME,
@@ -83,7 +84,7 @@ def get_model():
 
 
 # ---------------------------------------------------
-# SAFE ZERO VECTOR (prevents FAISS crash)
+# SAFE ZERO VECTOR (fallback only)
 # ---------------------------------------------------
 def zero_vector():
     vec = np.zeros((1, 384), dtype="float32")
@@ -92,7 +93,7 @@ def zero_vector():
 
 
 # ---------------------------------------------------
-# VALIDATE TEXT QUALITY
+# VALIDATE TEXT QUALITY (SOFT CHECK)
 # ---------------------------------------------------
 def is_low_quality(text: str):
 
@@ -104,12 +105,10 @@ def is_low_quality(text: str):
     if len(words) < 2:
         return True
 
-    # mostly numbers
-    digit_ratio = sum(c.isdigit() for c in text) / len(text)
-    if digit_ratio > 0.35:
+    digit_ratio = sum(c.isdigit() for c in text) / max(len(text),1)
+    if digit_ratio > 0.40:
         return True
 
-    # repeated characters like "aaaaa"
     if len(set(text)) < len(text) * 0.3:
         return True
 
@@ -126,12 +125,15 @@ def get_embedding(text: str) -> np.ndarray:
 
     text = clean_text(text)
 
+    # IMPORTANT: DO NOT reject — shorten instead
     if is_low_quality(text):
-        return zero_vector()
+        text = text[:40]
+
+    # stabilize transformer
+    text = text[:80]
 
     model = get_model()
 
-    # SentenceTransformer is NOT thread safe → lock required
     with _encode_lock:
         emb = model.encode(
             [text],
@@ -141,7 +143,7 @@ def get_embedding(text: str) -> np.ndarray:
             show_progress_bar=False
         ).astype("float32")
 
-    # stabilize similarity across scans
+    # reduce tiny OCR variations effect
     emb = np.round(emb, 6)
 
     return emb
