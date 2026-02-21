@@ -17,7 +17,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# IMAGE PREPROCESS (TITLE REGION FOCUS)
+# IMAGE PREPROCESS
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -25,21 +25,20 @@ def preprocess(path):
     if img is None:
         return None
 
-    # Resize large images (huge speed boost)
+    # resize large images
     h, w = img.shape[:2]
     scale = 1000 / max(h, w)
     if scale < 1:
         img = cv2.resize(img, None, fx=scale, fy=scale)
 
-    # Focus middle 70% (title area)
+    # focus title zone (top-middle)
     h, w = img.shape[:2]
-    crop = img[int(h*0.15):int(h*0.80), int(w*0.08):int(w*0.92)]
+    crop = img[int(h*0.10):int(h*0.70), int(w*0.10):int(w*0.90)]
 
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    gray = cv2.convertScaleAbs(gray, alpha=1.7, beta=15)
+    gray = cv2.convertScaleAbs(gray, alpha=1.6, beta=12)
     gray = cv2.GaussianBlur(gray,(5,5),0)
 
-    # adaptive threshold handles dark/light covers
     th = cv2.adaptiveThreshold(
         gray,255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -50,30 +49,107 @@ def preprocess(path):
 
 
 # ---------------------------------------------------
-# REMOVE JUNK TEXT
+# TEXT FILTER
 # ---------------------------------------------------
-def valid(text, conf):
+def is_bad_text(text):
 
-    if conf < 60:
-        return False
+    text_low = text.lower()
+
+    # remove mostly numbers
+    if sum(c.isdigit() for c in text) > len(text) * 0.4:
+        return True
+
+    # isbn / price
+    if re.search(r'\d{4,}', text):
+        return True
+
+    # common noise
+    bad = ["edition","press","publisher","volume","vol","rs","inr","isbn"]
+    if any(w in text_low for w in bad):
+        return True
 
     if len(text) < 3:
-        return False
+        return True
 
-    # remove numbers (isbn/price)
-    if re.search(r'\d{3,}', text):
-        return False
-
-    # remove common noise words
-    bad_words = ["edition","press","publisher","volume","vol","rs","inr"]
-    if any(w in text.lower() for w in bad_words):
-        return False
-
-    return True
+    return False
 
 
 # ---------------------------------------------------
-# PICK TITLE USING BIGGEST TEXT AREA
+# GROUP WORDS INTO LINES
+# ---------------------------------------------------
+def group_lines(data):
+
+    words = []
+
+    for i in range(len(data["text"])):
+        txt = data["text"][i].strip()
+        conf = int(data["conf"][i])
+
+        if conf < 60 or is_bad_text(txt):
+            continue
+
+        x = data["left"][i]
+        y = data["top"][i]
+        w = data["width"][i]
+        h = data["height"][i]
+
+        words.append((txt, x, y, w, h))
+
+    if not words:
+        return []
+
+    # sort vertically
+    words.sort(key=lambda x: x[2])
+
+    lines = []
+    current = [words[0]]
+
+    for w in words[1:]:
+        if abs(w[2] - current[-1][2]) < 35:
+            current.append(w)
+        else:
+            lines.append(current)
+            current = [w]
+
+    lines.append(current)
+    return lines
+
+
+# ---------------------------------------------------
+# PICK BEST TITLE
+# ---------------------------------------------------
+def pick_title(lines, img_height):
+
+    candidates = []
+
+    for line in lines:
+
+        text = " ".join(w[0] for w in line)
+
+        # prefer multi-word lines
+        word_count = len(text.split())
+        if word_count < 2:
+            continue
+
+        # total size
+        area = sum(w[3]*w[4] for w in line)
+
+        # vertical bias (top preferred)
+        avg_y = sum(w[2] for w in line)/len(line)
+        position_score = 1 - (avg_y/img_height)
+
+        score = area * (1 + position_score) * word_count
+        candidates.append((text, score))
+
+    if not candidates:
+        return ""
+
+    best = max(candidates, key=lambda x: x[1])[0]
+    return normalize(best)
+
+
+# ---------------------------------------------------
+# MAIN OCR
 # ---------------------------------------------------
 def extract_text(path: str) -> str:
     try:
@@ -81,53 +157,17 @@ def extract_text(path: str) -> str:
         if img is None:
             return ""
 
+        h = img.shape[0]
+
         data = pytesseract.image_to_data(
             img,
             config="--oem 3 --psm 6",
             output_type=pytesseract.Output.DICT
         )
 
-        candidates = []
+        lines = group_lines(data)
 
-        for i in range(len(data["text"])):
-            text = data["text"][i].strip()
-            conf = int(data["conf"][i])
-
-            if not valid(text, conf):
-                continue
-
-            w = data["width"][i]
-            h = data["height"][i]
-
-            # KEY IDEA → title = biggest visible text
-            score = w * h * conf
-            candidates.append((text, score, data["top"][i]))
-
-        if not candidates:
-            return ""
-
-        # sort top-to-bottom, then group lines
-        candidates.sort(key=lambda x: x[2])
-
-        # combine nearby lines (multi-line titles)
-        final_lines = []
-        current_line = [candidates[0]]
-
-        for i in range(1, len(candidates)):
-            if abs(candidates[i][2] - current_line[-1][2]) < 40:
-                current_line.append(candidates[i])
-            else:
-                final_lines.append(current_line)
-                current_line = [candidates[i]]
-
-        final_lines.append(current_line)
-
-        # choose group with largest total score
-        best_group = max(final_lines, key=lambda g: sum(x[1] for x in g))
-
-        title = " ".join(x[0] for x in best_group)
-
-        title = normalize(title)
+        title = pick_title(lines, h)
 
         print("DETECTED TITLE:", title)
         return title
