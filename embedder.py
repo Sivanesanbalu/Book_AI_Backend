@@ -12,7 +12,7 @@ _encode_lock = Lock()
 
 
 # ---------------------------------------------------
-# TEXT NORMALIZATION (OCR HARDENED)
+# TEXT NORMALIZATION (BALANCED — NOT TOO HARD)
 # ---------------------------------------------------
 def clean_text(text: str) -> str:
 
@@ -21,7 +21,7 @@ def clean_text(text: str) -> str:
 
     text = text.lower()
 
-    # common OCR mistakes
+    # OCR corrections
     fixes = {
         "systern":"system",
         "cornputer":"computer",
@@ -41,23 +41,26 @@ def clean_text(text: str) -> str:
 
     # remove symbols
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
-    text = re.sub(r'\s+', ' ', text).strip()
+    words = text.split()
 
-    # remove useless publishing words
+    # remove publishing noise (but KEEP title meaning words)
     stop_words = {
         "edition","third","fourth","fifth","sixth","seventh",
         "international","student","version","volume",
         "vol","part","series","publication","press","publisher",
-        "pearson","mcgraw","wiley","oxford","university"
+        "education","asia","india"
     }
 
-    words = [w for w in text.split() if w not in stop_words and len(w) > 2]
+    words = [w for w in words if w not in stop_words and len(w) > 2]
+
+    # keep max 8 words (important: don't over trim)
+    words = words[:8]
 
     return " ".join(words)
 
 
 # ---------------------------------------------------
-# SAFE MODEL LOAD (only once)
+# LOAD MODEL (ONLY ONCE — THREAD SAFE)
 # ---------------------------------------------------
 def get_model():
     global _model
@@ -69,11 +72,7 @@ def get_model():
 
                 torch.set_num_threads(1)
 
-                _model = SentenceTransformer(
-                    MODEL_NAME,
-                    device="cpu"
-                )
-
+                _model = SentenceTransformer(MODEL_NAME, device="cpu")
                 _model.max_seq_length = 64
                 _model.eval()
 
@@ -83,46 +82,34 @@ def get_model():
 
 
 # ---------------------------------------------------
-# SAFE ZERO VECTOR
+# VALID TITLE CHECK (prevents garbage embedding)
 # ---------------------------------------------------
-def zero_vector():
-    return np.zeros((1, 384), dtype="float32")
-
-
-# ---------------------------------------------------
-# LIGHT QUALITY CHECK (DO NOT DESTROY TEXT)
-# ---------------------------------------------------
-def soft_filter(text: str):
+def is_valid_title(text: str):
 
     if not text:
-        return ""
+        return False
 
     words = text.split()
 
-    # keep at least 2 words
     if len(words) < 2:
-        return text
+        return False
 
-    # trim too long OCR garbage
-    if len(text) > 120:
-        text = " ".join(words[:12])
+    digit_ratio = sum(c.isdigit() for c in text) / len(text)
+    if digit_ratio > 0.40:
+        return False
 
-    return text
+    return True
 
 
 # ---------------------------------------------------
-# MAIN EMBEDDING FUNCTION
+# EMBEDDING FUNCTION (FINAL STABLE)
 # ---------------------------------------------------
 def get_embedding(text: str) -> np.ndarray:
 
-    if not text:
-        return zero_vector()
-
     text = clean_text(text)
-    text = soft_filter(text)
 
-    if not text:
-        return zero_vector()
+    if not is_valid_title(text):
+        return None   # IMPORTANT: never send fake vector
 
     model = get_model()
 
