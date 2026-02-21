@@ -1,186 +1,144 @@
-import faiss
-import json
 import os
-import numpy as np
-from embedder import get_embedding
-from threading import Lock
+os.environ["OMP_NUM_THREADS"] = "1"
+
+import cv2
+import pytesseract
 import re
-from rapidfuzz import fuzz
+from collections import Counter
 
-DATA_DIR = "data"
-INDEX_PATH = os.path.join(DATA_DIR, "index.faiss")
-DB_PATH = os.path.join(DATA_DIR, "books_db.json")
-
-DIM = 384
-
-# tuned thresholds for book titles
-SEMANTIC_THRESHOLD = 0.72
-STRONG_DUPLICATE = 0.80
-STRING_THRESHOLD = 85
-
-lock = Lock()
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# ---------------- GLOBAL CACHE ----------------
-_index = None
-_books_cache = None
-
-
-# ---------------- TEXT NORMALIZATION ----------------
-def normalize_text(text: str) -> str:
+# ---------------------------------------------------
+# NORMALIZE TEXT
+# ---------------------------------------------------
+def normalize(text: str) -> str:
     text = text.lower()
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
-# ---------------- LOAD DATABASE ----------------
-def load_db():
-    global _books_cache
+# ---------------------------------------------------
+# MULTI PREPROCESS (3 VERSIONS)
+# ---------------------------------------------------
+def preprocess_versions(path):
 
-    if _books_cache is not None:
-        return _books_cache
+    img = cv2.imread(path)
+    if img is None:
+        return []
 
-    if not os.path.exists(DB_PATH):
-        _books_cache = []
-        return _books_cache
+    h, w = img.shape[:2]
 
-    with open(DB_PATH, "r", encoding="utf-8") as f:
-        _books_cache = json.load(f)
+    # focus book center
+    crop = img[int(h*0.10):int(h*0.75), int(w*0.10):int(w*0.90)]
 
-    return _books_cache
+    versions = []
 
+    # 1 NORMAL
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    versions.append(gray)
 
-def save_db(data):
-    global _books_cache
-    _books_cache = data
-    with open(DB_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    # 2 SHARP
+    sharp = cv2.convertScaleAbs(gray, alpha=1.8, beta=20)
+    versions.append(sharp)
 
+    # 3 THRESHOLD
+    th = cv2.adaptiveThreshold(
+        gray,255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,31,2
+    )
+    versions.append(th)
 
-# ---------------- BUILD INDEX (COSINE SIMILARITY) ----------------
-def build_index(books):
-
-    # cosine similarity index
-    index = faiss.IndexHNSWFlat(DIM, 32, faiss.METRIC_INNER_PRODUCT)
-    index.hnsw.efSearch = 80
-    index.hnsw.efConstruction = 40
-
-    if len(books) == 0:
-        return index
-
-    embeddings = []
-
-    for b in books:
-        emb = get_embedding(b["title"])
-        embeddings.append(emb)
-
-    embeddings = np.vstack(embeddings).astype("float32")
-    index.add(embeddings)
-
-    return index
+    return versions
 
 
-# ---------------- SAFE INDEX LOAD ----------------
-def load_index():
-    global _index
+# ---------------------------------------------------
+# FILTER BAD TEXT
+# ---------------------------------------------------
+def is_valid_candidate(text):
 
-    if _index is not None:
-        return _index
+    if len(text) < 4:
+        return False
 
-    books = load_db()
-    rebuild = True
+    if sum(c.isdigit() for c in text) > len(text)*0.4:
+        return False
 
-    if os.path.exists(INDEX_PATH):
-        try:
-            idx = faiss.read_index(INDEX_PATH)
+    bad = ["edition","press","publisher","isbn","volume","vol","rs","inr"]
+    t = text.lower()
 
-            # important safety check
-            if idx.ntotal == len(books):
-                _index = idx
-                rebuild = False
-                print("FAISS index loaded from disk")
+    if any(w in t for w in bad):
+        return False
 
-        except:
-            pass
+    words = text.split()
+    if len(words) < 2:
+        return False
 
-    if rebuild:
-        print("Rebuilding FAISS index safely...")
-        _index = build_index(books)
-        faiss.write_index(_index, INDEX_PATH)
-
-    return _index
+    return True
 
 
-# ---------------- SEARCH BOOK ----------------
-def search_book(text: str):
+# ---------------------------------------------------
+# EXTRACT CANDIDATES FROM IMAGE
+# ---------------------------------------------------
+def extract_candidates(img):
 
-    text = normalize_text(text)
+    data = pytesseract.image_to_data(
+        img,
+        config="--oem 3 --psm 6",
+        output_type=pytesseract.Output.DICT
+    )
 
-    if len(text) < 3:
-        return None, 0.0
+    lines = {}
+    for i, word in enumerate(data["text"]):
 
-    books = load_db()
-    if len(books) == 0:
-        return None, 0.0
+        word = word.strip()
+        if not word:
+            continue
 
-    index = load_index()
+        conf = int(data["conf"][i])
+        if conf < 55:
+            continue
 
-    query = get_embedding(text)
-    D, I = index.search(query, 1)
+        line_num = data["line_num"][i]
+        lines.setdefault(line_num, []).append(word)
 
-    similarity = float(D[0][0])
-    idx = int(I[0][0])
+    results = []
 
-    if idx < 0 or idx >= len(books):
-        return None, 0.0
+    for line in lines.values():
+        text = " ".join(line)
+        text = normalize(text)
 
-    # semantic filter
-    if similarity < SEMANTIC_THRESHOLD:
-        return None, similarity
+        if is_valid_candidate(text):
+            results.append(text)
 
-    stored_title = books[idx]["title"]
-
-    # string verification (prevents color / design confusion)
-    string_score = fuzz.token_sort_ratio(text, stored_title)
-
-    if string_score < STRING_THRESHOLD:
-        return None, similarity
-
-    return books[idx], similarity
+    return results
 
 
-# ---------------- ADD BOOK ----------------
-def add_book(title: str):
+# ---------------------------------------------------
+# MAIN OCR WITH VOTING
+# ---------------------------------------------------
+def extract_text(path: str) -> str:
+    try:
 
-    global _index
+        versions = preprocess_versions(path)
 
-    title = normalize_text(title)
-    if len(title) < 3:
-        return None
+        all_candidates = []
 
-    with lock:
+        for img in versions:
+            candidates = extract_candidates(img)
+            all_candidates.extend(candidates)
 
-        books = load_db()
+        if not all_candidates:
+            print("OCR: nothing detected")
+            return ""
 
-        # semantic duplicate protection
-        existing, sim = search_book(title)
-        if existing and sim > STRONG_DUPLICATE:
-            return existing
+        # voting (MOST FREQUENT TITLE)
+        vote = Counter(all_candidates)
+        best, count = vote.most_common(1)[0]
 
-        # strong string duplicate
-        for b in books:
-            if fuzz.token_sort_ratio(title, b["title"]) > 92:
-                return b
+        print("OCR candidates:", vote)
+        print("FINAL TITLE:", best)
 
-        # add new book
-        books.append({"title": title})
-        save_db(books)
+        return best
 
-        emb = get_embedding(title)
-        index = load_index()
-        index.add(emb)
-
-        faiss.write_index(index, INDEX_PATH)
-
-        return {"title": title}
+    except Exception as e:
+        print("OCR FAILED:", e)
+        return ""
