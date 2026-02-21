@@ -4,7 +4,7 @@ import faiss
 import numpy as np
 from rapidfuzz import fuzz
 
-from embedding import get_embedding, clean_text
+from embedder import get_embedding, clean_text
 
 # IMPORTANT: prevent CPU overload
 faiss.omp_set_num_threads(1)
