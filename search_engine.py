@@ -17,7 +17,29 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# MULTI PREPROCESS (3 VERSIONS)
+# AUTO ROTATE (critical for book spines)
+# ---------------------------------------------------
+def auto_rotate(img):
+
+    try:
+        osd = pytesseract.image_to_osd(img)
+        angle = int(re.search('Rotate: (\d+)', osd).group(1))
+
+        if angle == 90:
+            img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        elif angle == 180:
+            img = cv2.rotate(img, cv2.ROTATE_180)
+        elif angle == 270:
+            img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+
+    except:
+        pass
+
+    return img
+
+
+# ---------------------------------------------------
+# MULTI PREPROCESS
 # ---------------------------------------------------
 def preprocess_versions(path):
 
@@ -25,34 +47,36 @@ def preprocess_versions(path):
     if img is None:
         return []
 
-    h, w = img.shape[:2]
+    img = auto_rotate(img)
 
-    # focus book center
+    h, w = img.shape[:2]
     crop = img[int(h*0.10):int(h*0.75), int(w*0.10):int(w*0.90)]
+
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 
     versions = []
 
-    # 1 NORMAL
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    # normal
     versions.append(gray)
 
-    # 2 SHARP
-    sharp = cv2.convertScaleAbs(gray, alpha=1.8, beta=20)
-    versions.append(sharp)
+    # sharpen
+    versions.append(cv2.convertScaleAbs(gray, alpha=1.8, beta=20))
 
-    # 3 THRESHOLD
-    th = cv2.adaptiveThreshold(
+    # threshold
+    versions.append(cv2.adaptiveThreshold(
         gray,255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,31,2
-    )
-    versions.append(th)
+    ))
+
+    # inverted (very important for dark covers)
+    versions.append(cv2.bitwise_not(gray))
 
     return versions
 
 
 # ---------------------------------------------------
-# FILTER BAD TEXT
+# VALID TEXT FILTER
 # ---------------------------------------------------
 def is_valid_candidate(text):
 
@@ -63,20 +87,17 @@ def is_valid_candidate(text):
         return False
 
     bad = ["edition","press","publisher","isbn","volume","vol","rs","inr"]
-    t = text.lower()
-
-    if any(w in t for w in bad):
+    if any(w in text for w in bad):
         return False
 
-    words = text.split()
-    if len(words) < 2:
+    if len(text.split()) < 2:
         return False
 
     return True
 
 
 # ---------------------------------------------------
-# EXTRACT CANDIDATES FROM IMAGE
+# EXTRACT TEXT LINES
 # ---------------------------------------------------
 def extract_candidates(img):
 
@@ -87,6 +108,7 @@ def extract_candidates(img):
     )
 
     lines = {}
+
     for i, word in enumerate(data["text"]):
 
         word = word.strip()
@@ -103,9 +125,7 @@ def extract_candidates(img):
     results = []
 
     for line in lines.values():
-        text = " ".join(line)
-        text = normalize(text)
-
+        text = normalize(" ".join(line))
         if is_valid_candidate(text):
             results.append(text)
 
@@ -113,32 +133,60 @@ def extract_candidates(img):
 
 
 # ---------------------------------------------------
-# MAIN OCR WITH VOTING
+# MERGE SIMILAR TITLES
 # ---------------------------------------------------
-def extract_text(path: str) -> str:
-    try:
+def merge_similar(texts):
 
+    merged = []
+
+    for t in texts:
+        added = False
+        for i, m in enumerate(merged):
+            if t in m or m in t:
+                merged[i] = max(t, m, key=len)
+                added = True
+                break
+        if not added:
+            merged.append(t)
+
+    return merged
+
+
+# ---------------------------------------------------
+# MAIN OCR
+# ---------------------------------------------------
+def extract_text(path: str):
+
+    try:
         versions = preprocess_versions(path)
 
         all_candidates = []
 
         for img in versions:
-            candidates = extract_candidates(img)
-            all_candidates.extend(candidates)
+            all_candidates.extend(extract_candidates(img))
 
         if not all_candidates:
             print("OCR: nothing detected")
-            return ""
+            return []
 
-        # voting (MOST FREQUENT TITLE)
+        # vote
         vote = Counter(all_candidates)
-        best, count = vote.most_common(1)[0]
 
-        print("OCR candidates:", vote)
-        print("FINAL TITLE:", best)
+        # sort by frequency + length
+        ranked = sorted(
+            vote.items(),
+            key=lambda x: (x[1], len(x[0])),
+            reverse=True
+        )
 
-        return best
+        candidates = [t[0] for t in ranked[:8]]
+
+        candidates = merge_similar(candidates)
+
+        print("OCR FINAL CANDIDATES:", candidates)
+
+        return candidates
 
     except Exception as e:
         print("OCR FAILED:", e)
-        return ""
+        return []

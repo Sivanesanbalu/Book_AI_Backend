@@ -1,20 +1,25 @@
 fastapi==0.110.0
-uvicorn==0.29.0
+uvicorn[standard]==0.29.0
 firebase-admin==6.5.0
 python-multipart==0.0.9
 pydantic==2.7.1
 
 # OCR
 pytesseract==0.3.10
-opencv-python-headless==4.9.0.80
-Pillow==10.3.0
+opencv-python-headless==4.8.1.78
+Pillow==10.2.0
 
-# Semantic search (stable versions for Render RAM)
+# Embeddings (VERY IMPORTANT VERSIONS)
+torch==2.1.2
+sentence-transformers==2.2.2
+transformers==4.37.2
+numpy==1.26.2
+
+# Vector search
 faiss-cpu==1.7.4
-sentence-transformers==2.6.1
-torch==2.2.2
-numpy==1.26.4
-scikit-learn==1.4.2
+
+# ML utils
+scikit-learn==1.3.2
 
 # String similarity
 rapidfuzz==3.9.3

@@ -55,15 +55,12 @@ def is_bad_text(text):
 
     text_low = text.lower()
 
-    # remove mostly numbers
     if sum(c.isdigit() for c in text) > len(text) * 0.4:
         return True
 
-    # isbn / price
     if re.search(r'\d{4,}', text):
         return True
 
-    # common noise
     bad = ["edition","press","publisher","volume","vol","rs","inr","isbn"]
     if any(w in text_low for w in bad):
         return True
@@ -98,7 +95,6 @@ def group_lines(data):
     if not words:
         return []
 
-    # sort vertically
     words.sort(key=lambda x: x[2])
 
     lines = []
@@ -116,46 +112,56 @@ def group_lines(data):
 
 
 # ---------------------------------------------------
-# PICK BEST TITLE
+# PICK MULTIPLE TITLES (MAIN FIX)
 # ---------------------------------------------------
-def pick_title(lines, img_height):
+def pick_titles(lines, img_height):
 
-    candidates = []
+    scored = []
 
     for line in lines:
 
         text = " ".join(w[0] for w in line)
+        text = normalize(text)
 
-        # prefer multi-word lines
         word_count = len(text.split())
         if word_count < 2:
             continue
 
-        # total size
         area = sum(w[3]*w[4] for w in line)
 
-        # vertical bias (top preferred)
         avg_y = sum(w[2] for w in line)/len(line)
         position_score = 1 - (avg_y/img_height)
 
-        score = area * (1 + position_score) * word_count
-        candidates.append((text, score))
+        length_bonus = min(word_count / 5, 2)
 
-    if not candidates:
-        return ""
+        score = area * (1.2 + position_score + length_bonus)
 
-    best = max(candidates, key=lambda x: x[1])[0]
-    return normalize(best)
+        scored.append((text, score))
+
+    if not scored:
+        return []
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    # remove duplicates
+    results = []
+    for text, _ in scored:
+        if all(text not in r and r not in text for r in results):
+            results.append(text)
+        if len(results) == 5:
+            break
+
+    return results
 
 
 # ---------------------------------------------------
 # MAIN OCR
 # ---------------------------------------------------
-def extract_text(path: str) -> str:
+def extract_text(path: str) -> list[str]:
     try:
         img = preprocess(path)
         if img is None:
-            return ""
+            return []
 
         h = img.shape[0]
 
@@ -167,11 +173,12 @@ def extract_text(path: str) -> str:
 
         lines = group_lines(data)
 
-        title = pick_title(lines, h)
+        titles = pick_titles(lines, h)
 
-        print("DETECTED TITLE:", title)
-        return title
+        print("OCR CANDIDATES:", titles)
+
+        return titles
 
     except Exception as e:
         print("OCR FAILED:", e)
-        return ""
+        return []

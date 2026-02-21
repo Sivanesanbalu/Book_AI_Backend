@@ -36,6 +36,29 @@ async def run_ocr(path: str):
     return await loop.run_in_executor(None, extract_text, path)
 
 
+# ------------------------------------------------
+# FIND BEST MATCH FROM OCR CANDIDATES
+# ------------------------------------------------
+def best_match_from_candidates(candidates):
+
+    best_book = None
+    best_score = 0
+    best_text = None
+
+    for text in candidates:
+        if not text or len(text) < 3:
+            continue
+
+        book, score = search_book(text)
+
+        if score > best_score:
+            best_book = book
+            best_score = score
+            best_text = text
+
+    return best_book, best_score, best_text
+
+
 ############################################################
 # 🔎 SCAN — ONLY CHECK
 ############################################################
@@ -45,12 +68,12 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
     path = save_temp_file(file)
 
     try:
-        title = await run_ocr(path)
+        titles = await run_ocr(path)
 
-        if not title or len(title) < 4:
+        if not titles:
             return {"status": "no_text"}
 
-        book, score = search_book(title)
+        book, score, detected = best_match_from_candidates(titles)
 
         # GLOBAL BOOK FOUND
         if book:
@@ -69,15 +92,16 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
             }
 
         # USER FALLBACK CHECK
-        if user_has_book(uid, title):
+        if detected and user_has_book(uid, detected):
             return {
                 "status": "owned",
-                "title": title
+                "title": detected
             }
 
         return {
             "status": "unknown",
-            "detected_title": title
+            "detected_title": detected,
+            "candidates": titles
         }
 
     except Exception as e:
@@ -97,19 +121,23 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
     path = save_temp_file(file)
 
     try:
-        title = await run_ocr(path)
+        titles = await run_ocr(path)
 
-        if not title or len(title) < 4:
+        if not titles:
             return {"status": "failed"}
 
-        book, score = search_book(title)
+        book, score, detected = best_match_from_candidates(titles)
 
-        # BOOK ALREADY KNOWN
+        # BOOK ALREADY KNOWN IN GLOBAL DB
         if book:
             final_title = book["title"]
         else:
-            final_title = title
-            add_book(final_title)
+            final_title = detected
+            if final_title:
+                add_book(final_title)
+
+        if not final_title:
+            return {"status": "failed"}
 
         if user_has_book(uid, final_title):
             return {
