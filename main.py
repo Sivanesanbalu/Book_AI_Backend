@@ -5,7 +5,7 @@ import asyncio
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
 
-# 🔥 IMPORTANT — preload AI models when server starts
+# 🔥 preload models on startup
 import startup
 
 from ocr import extract_text
@@ -61,7 +61,7 @@ def best_match_from_candidates(candidates):
 
 
 # ==============================================================
-# 🔎 SCAN (ONLY DETECT — LIVE PREVIEW)
+# 🔎 LIVE SCAN (PREVIEW ONLY)
 # ==============================================================
 @app.post("/scan")
 async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -85,7 +85,7 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
         else:
             return {"status": "no_text"}
 
-        # stability memory
+        # ---- stability memory ----
         memory = get_memory(uid)
         stable_title = memory.update(candidate_title)
 
@@ -118,7 +118,7 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
 
 
 # ==============================================================
-# 📸 CAPTURE (DETECT + SAVE — EVEN WITHOUT SCAN)
+# 📸 CAPTURE (FINAL SAVE — ALWAYS WORKS)
 # ==============================================================
 @app.post("/capture")
 async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -127,26 +127,40 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
 
     try:
         memory = get_memory(uid)
-        final_title = memory.confirm()
+        memory_title = memory.confirm()
 
-        # ---- If user didn't scan → run OCR once ----
-        if not final_title:
+        # 🔥 ALWAYS RUN OCR
+        titles = await run_ocr(path)
 
-            titles = await run_ocr(path)
+        detected_title = None
+        score = 0
 
-            if not titles:
-                return {"status": "no_text"}
-
-            book, score, detected = best_match_from_candidates(titles)
+        if titles:
+            book, s, detected = best_match_from_candidates(titles)
 
             if book:
-                final_title = book["title"]
+                detected_title = book["title"]
+                score = s
             elif detected:
-                final_title = detected
-            else:
-                return {"status": "no_text"}
+                detected_title = detected
 
-        # already saved
+        # -----------------------------
+        # SELECT FINAL TITLE
+        # -----------------------------
+        final_title = None
+
+        if detected_title and memory_title:
+            final_title = detected_title   # OCR wins
+        elif detected_title:
+            final_title = detected_title
+        elif memory_title:
+            final_title = memory_title
+        else:
+            return {"status": "no_text"}
+
+        print("📸 FINAL CAPTURE TITLE:", final_title)
+
+        # already exists
         if user_has_book(uid, final_title):
             return {"status": "already_saved", "title": final_title}
 

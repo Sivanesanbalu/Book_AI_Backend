@@ -5,41 +5,10 @@ import cv2
 import pytesseract
 import numpy as np
 import re
-from PIL import Image, ExifTags
 
 
 # ---------------------------------------------------
-# FIX MOBILE ROTATION (VERY IMPORTANT)
-# ---------------------------------------------------
-def fix_rotation(path):
-    try:
-        image = Image.open(path)
-
-        for orientation in ExifTags.TAGS.keys():
-            if ExifTags.TAGS[orientation] == 'Orientation':
-                break
-
-        exif = image._getexif()
-        if exif is None:
-            return
-
-        orientation_value = exif.get(orientation, None)
-
-        if orientation_value == 3:
-            image = image.rotate(180, expand=True)
-        elif orientation_value == 6:
-            image = image.rotate(270, expand=True)
-        elif orientation_value == 8:
-            image = image.rotate(90, expand=True)
-
-        image.save(path)
-
-    except:
-        pass
-
-
-# ---------------------------------------------------
-# ORDER POINTS
+# ORDER POINTS (for perspective correction)
 # ---------------------------------------------------
 def order_points(pts):
     rect = np.zeros((4,2), dtype="float32")
@@ -66,7 +35,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# PREPROCESS IMAGE (REAL WORLD CAMERA READY)
+# SMART BOOK DETECTION + MOBILE FALLBACK
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -76,7 +45,7 @@ def preprocess(path):
 
     original = img.copy()
 
-    # SAFE RESIZE
+    # resize huge mobile images
     max_dim = max(img.shape[0], img.shape[1])
     if max_dim > 1400:
         ratio = max_dim / 1400.0
@@ -85,7 +54,7 @@ def preprocess(path):
     else:
         scale_ratio = 1.0
 
-    # TRY BOOK RECTANGLE DETECTION
+    # try perspective detection
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5,5), 0)
     edged = cv2.Canny(blur, 60, 160)
@@ -122,20 +91,18 @@ def preprocess(path):
             warped = cv2.warpPerspective(original, M, (maxWidth, maxHeight))
             break
 
-    # MOBILE FALLBACK (MOST IMPORTANT)
+    # ---------- fallback (mobile friendly)
     if warped is None:
         gray = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
+
         h, w = gray.shape
-
-        # focus on title area
-        gray = gray[int(h*0.18):int(h*0.60), int(w*0.08):int(w*0.92)]
-
-        # lighting correction
+        gray = gray[int(h*0.18):int(h*0.65), int(w*0.08):int(w*0.92)]
         gray = cv2.equalizeHist(gray)
+
     else:
         gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
 
-    # OCR CLEANUP
+    # denoise + threshold
     gray = cv2.bilateralFilter(gray, 9, 75, 75)
     gray = cv2.adaptiveThreshold(
         gray,255,
@@ -147,21 +114,21 @@ def preprocess(path):
 
 
 # ---------------------------------------------------
-# TEXT FILTER
+# FILTER BAD TEXT
 # ---------------------------------------------------
 def is_bad_text(text):
 
     text_low = text.lower()
 
-    if sum(c.isdigit() for c in text) > len(text)*0.4:
+    if sum(c.isdigit() for c in text) > len(text)*0.45:
         return True
 
-    if re.search(r'\d{4,}', text):
+    if re.search(r'\d{5,}', text):
         return True
 
     bad_words = [
         "edition","press","publisher","volume",
-        "vol","isbn","copyright","rs","inr"
+        "isbn","copyright","rs","inr"
     ]
 
     if any(w in text_low for w in bad_words):
@@ -183,9 +150,13 @@ def group_lines(data, img_height):
     for i in range(len(data["text"])):
 
         txt = data["text"][i].strip()
-        conf = int(data["conf"][i])
 
-        if conf < 55 or is_bad_text(txt):
+        try:
+            conf = float(data["conf"][i])
+        except:
+            conf = 0
+
+        if conf < 40 or is_bad_text(txt):
             continue
 
         x = data["left"][i]
@@ -215,7 +186,7 @@ def group_lines(data, img_height):
 
 
 # ---------------------------------------------------
-# PICK TITLE
+# PICK BEST TITLE
 # ---------------------------------------------------
 def pick_titles(lines, img_height):
 
@@ -252,32 +223,42 @@ def pick_titles(lines, img_height):
 
 
 # ---------------------------------------------------
-# MAIN OCR FUNCTION
+# MAIN OCR FUNCTION (MULTI PSM)
 # ---------------------------------------------------
 def extract_text(path: str) -> list[str]:
 
     try:
-        # 🔥 critical step
-        fix_rotation(path)
-
         img = preprocess(path)
         if img is None:
             return []
 
         h = img.shape[0]
 
-        data = pytesseract.image_to_data(
-            img,
-            config="--oem 3 --psm 4 -l eng",
-            output_type=pytesseract.Output.DICT
-        )
+        # try multiple OCR modes (very important)
+        psm_modes = [6, 7, 11]
 
-        lines = group_lines(data, h)
-        titles = pick_titles(lines, h)
+        all_titles = []
 
-        print("📖 OCR TITLES:", titles)
+        for psm in psm_modes:
+            data = pytesseract.image_to_data(
+                img,
+                config=f"--oem 3 --psm {psm} -l eng",
+                output_type=pytesseract.Output.DICT
+            )
 
-        return titles
+            lines = group_lines(data, h)
+            titles = pick_titles(lines, h)
+
+            all_titles.extend(titles)
+
+        # remove duplicates
+        unique = []
+        for t in all_titles:
+            if t not in unique:
+                unique.append(t)
+
+        print("📖 OCR TITLES:", unique)
+        return unique[:6]
 
     except Exception as e:
         print("OCR FAILED:", e)

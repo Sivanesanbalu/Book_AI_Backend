@@ -12,7 +12,7 @@ _encode_lock = Lock()
 
 
 # ---------------------------------------------------
-# TEXT NORMALIZATION (BALANCED — NOT TOO HARD)
+# TEXT NORMALIZATION (BALANCED)
 # ---------------------------------------------------
 def clean_text(text: str) -> str:
 
@@ -33,7 +33,9 @@ def clean_text(text: str) -> str:
         "pyth0n":"python",
         "alg0rithm":"algorithm",
         "databse":"database",
-        "netw0rk":"network"
+        "netw0rk":"network",
+        "macnine":"machine",
+        "powere":"power",
     }
 
     for wrong, correct in fixes.items():
@@ -41,26 +43,28 @@ def clean_text(text: str) -> str:
 
     # remove symbols
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
+
     words = text.split()
 
-    # remove publishing noise (but KEEP title meaning words)
+    # publishing noise only (SAFE)
     stop_words = {
-        "edition","third","fourth","fifth","sixth","seventh",
-        "international","student","version","volume",
-        "vol","part","series","publication","press","publisher",
+        "edition","international","student","version",
+        "volume","vol","publication","press","publisher",
         "education","asia","india"
     }
 
-    words = [w for w in words if w not in stop_words and len(w) > 2]
+    words = [w for w in words if w not in stop_words]
 
-    # keep max 8 words (important: don't over trim)
-    words = words[:8]
+    # limit words but don't destroy meaning
+    words = words[:10]
 
-    return " ".join(words)
+    text = re.sub(r'\s+', ' ', " ".join(words)).strip()
+
+    return text
 
 
 # ---------------------------------------------------
-# LOAD MODEL (ONLY ONCE — THREAD SAFE)
+# LOAD MODEL (THREAD SAFE)
 # ---------------------------------------------------
 def get_model():
     global _model
@@ -82,7 +86,7 @@ def get_model():
 
 
 # ---------------------------------------------------
-# VALID TITLE CHECK (prevents garbage embedding)
+# VALID TITLE CHECK (RELAXED)
 # ---------------------------------------------------
 def is_valid_title(text: str):
 
@@ -91,25 +95,29 @@ def is_valid_title(text: str):
 
     words = text.split()
 
-    if len(words) < 2:
+    # allow single word titles
+    if len(words) == 0:
         return False
 
-    digit_ratio = sum(c.isdigit() for c in text) / len(text)
-    if digit_ratio > 0.40:
+    digit_ratio = sum(c.isdigit() for c in text) / max(len(text),1)
+
+    # relaxed rule (important)
+    if digit_ratio > 0.65:
         return False
 
     return True
 
 
 # ---------------------------------------------------
-# EMBEDDING FUNCTION (FINAL STABLE)
+# EMBEDDING FUNCTION (SAFE)
 # ---------------------------------------------------
 def get_embedding(text: str) -> np.ndarray:
 
     text = clean_text(text)
 
     if not is_valid_title(text):
-        return None   # IMPORTANT: never send fake vector
+        # return neutral vector (prevents faiss crash)
+        return np.zeros((1,384), dtype="float32")
 
     model = get_model()
 

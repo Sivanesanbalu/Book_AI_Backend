@@ -25,19 +25,24 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 # ---------------------------------------------------
-# NORMALIZE TITLE
+# NORMALIZE TITLE (OCR FRIENDLY)
 # ---------------------------------------------------
 def normalize_title(text: str) -> str:
     text = text.lower()
 
     fixes = {
         "machne":"machine",
+        "macnine":"machine",
         "lernng":"learning",
+        "larnng":"learning",
         "inteligence":"intelligence",
         "artifcial":"artificial",
         "pyth0n":"python",
         "alg0rithm":"algorithm",
-        "databse":"database"
+        "databse":"database",
+        "powere":"power",
+        "netwrok":"network",
+        "computre":"computer"
     }
 
     for w,c in fixes.items():
@@ -76,7 +81,7 @@ def load_user_books(user_id: str):
                 return titles
 
     docs = db.collection("users").document(user_id).collection("books").stream()
-    titles = set(doc.to_dict().get("title","") for doc in docs)
+    titles = set(normalize_title(doc.to_dict().get("title","")) for doc in docs)
 
     with cache_lock:
         _user_cache[user_id] = (titles, now + CACHE_TTL)
@@ -86,16 +91,16 @@ def load_user_books(user_id: str):
     return titles
 
 # ---------------------------------------------------
-# SIMILARITY CHECK
+# SIMILARITY CHECK (OCR TOLERANT)
 # ---------------------------------------------------
 def is_similar(a,b):
-    if abs(len(a)-len(b)) > 12:
+    if abs(len(a)-len(b)) > 18:
         return False
 
     return max(
         fuzz.token_set_ratio(a,b),
         fuzz.partial_ratio(a,b)
-    ) >= 86
+    ) >= 78
 
 # ---------------------------------------------------
 # CHECK USER OWNS BOOK
@@ -111,7 +116,7 @@ def user_has_book(user_id: str, title: str):
     return False
 
 # ---------------------------------------------------
-# SAVE BOOK (FINAL WORKING)
+# SAVE BOOK (FINAL STABLE)
 # ---------------------------------------------------
 def save_book_for_user(user_id: str, title: str):
 
@@ -123,15 +128,14 @@ def save_book_for_user(user_id: str, title: str):
 
     print("🔥 Trying save:", clean)
 
-    # Duplicate check
-    docs = user_ref.collection("books").stream()
-    for d in docs:
-        saved = d.to_dict().get("title","")
-        if is_similar(clean, saved):
+    # Duplicate check (FAST CACHE FIRST)
+    books = load_user_books(user_id)
+    for b in books:
+        if is_similar(clean, b):
             print("⚠️ Similar book exists — skip")
             return False
 
-    # Atomic insert
+    # Firestore Transaction
     @firestore.transactional
     def txn(transaction):
 
@@ -143,7 +147,7 @@ def save_book_for_user(user_id: str, title: str):
         transaction.set(doc_ref,{
             "title": clean,
             "original": title,
-            "time": datetime.utcnow()   # ⭐ IMPORTANT (Flutter reads this)
+            "time": datetime.utcnow()
         })
         return True
 
@@ -152,9 +156,12 @@ def save_book_for_user(user_id: str, title: str):
     if created:
         print("✅ FIREBASE SAVED:", clean)
 
+        # FIXED CACHE UPDATE
         with cache_lock:
             if user_id in _user_cache:
-                _user_cache[user_id][0].add(clean)
+                titles, expire = _user_cache[user_id]
+                titles.add(clean)
+                _user_cache[user_id] = (titles, expire)
 
     else:
         print("❌ SAVE FAILED")

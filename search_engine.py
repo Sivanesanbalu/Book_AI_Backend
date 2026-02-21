@@ -6,7 +6,7 @@ from rapidfuzz import fuzz
 
 from embedder import get_embedding, clean_text
 
-# IMPORTANT: prevent CPU overload
+# Prevent CPU overload on Render
 faiss.omp_set_num_threads(1)
 
 DATA_FILE = "data/books.json"
@@ -16,6 +16,27 @@ os.makedirs("data", exist_ok=True)
 
 _books_cache = []
 _index = None
+DIM = 384
+
+
+# ---------------------------------------------------------
+# VALID TITLE CHECK  ⭐ IMPORTANT
+# ---------------------------------------------------------
+def is_valid_title(title: str):
+    words = title.split()
+
+    if len(words) < 2:
+        return False
+
+    # reject garbage OCR
+    bad = ["and", "the", "for", "with", "from", "into", "book"]
+    if sum(w in bad for w in words) >= len(words) - 1:
+        return False
+
+    if len(title) < 6:
+        return False
+
+    return True
 
 
 # ---------------- LOAD DATABASE ----------------
@@ -37,25 +58,30 @@ def save_books(books):
         json.dump(books, f, indent=2)
 
 
-# ---------------- BUILD INDEX (ONLY ON STARTUP) ----------------
+# ---------------- BUILD INDEX ----------------
 def build_index():
 
-    global _index
+    global _index, _books_cache
+
     books = load_books()
 
     vectors = []
     valid_books = []
 
     for b in books:
-        emb = get_embedding(b["title"])
+        title = clean_text(b["title"])
 
+        if not is_valid_title(title):
+            continue
+
+        emb = get_embedding(title)
         if emb is None:
             continue
 
         vectors.append(emb[0])
-        valid_books.append(b)
+        valid_books.append({"title": title})
 
-    _books_cache[:] = valid_books
+    _books_cache = valid_books
 
     if not vectors:
         _index = None
@@ -63,7 +89,7 @@ def build_index():
 
     emb = np.array(vectors).astype("float32")
 
-    _index = faiss.IndexFlatIP(384)
+    _index = faiss.IndexFlatIP(DIM)
     _index.add(emb)
 
     faiss.write_index(_index, INDEX_FILE)
@@ -84,7 +110,7 @@ def load_index():
     return _index
 
 
-# load on startup
+# Load at startup
 load_books()
 load_index()
 
@@ -98,12 +124,16 @@ def search_book(text):
         return None, 0
 
     query = clean_text(text)
-    emb = get_embedding(query)
 
+    if not is_valid_title(query):
+        return None, 0
+
+    emb = get_embedding(query)
     if emb is None:
         return None, 0
 
-    D, I = _index.search(emb, min(5, len(_books_cache)))
+    k = min(5, len(_books_cache))
+    D, I = _index.search(emb, k)
 
     best_book = None
     best_score = 0
@@ -111,18 +141,19 @@ def search_book(text):
     for sim, idx in zip(D[0], I[0]):
 
         book = _books_cache[int(idx)]
-        title = clean_text(book["title"])
+        title = book["title"]
 
         semantic = float(sim)
         fuzzy = fuzz.token_set_ratio(query, title) / 100
 
-        score = (semantic * 0.75) + (fuzzy * 0.25)
+        # ⭐ balanced hybrid score
+        score = (semantic * 0.72) + (fuzzy * 0.28)
 
         if score > best_score:
             best_score = score
             best_book = book
 
-    if best_score < 0.70:
+    if best_score < 0.68:
         return None, best_score
 
     return best_book, best_score
@@ -133,40 +164,38 @@ def is_duplicate(title):
 
     book, score = search_book(title)
 
-    if book and score > 0.82:
+    if book and score > 0.80:
         print("📕 Duplicate:", book["title"], "score:", score)
         return True
 
     return False
 
 
-# ---------------- ⭐ INSTANT ADD (NO REBUILD) ----------------
+# ---------------- INSTANT ADD ----------------
 def add_book(title):
 
     global _books_cache, _index
 
     title = clean_text(title)
 
-    # reject weak titles
-    if len(title.split()) < 2:
+    if not is_valid_title(title):
         print("⚠️ Ignored weak OCR:", title)
         return
 
     if is_duplicate(title):
         return
 
-    # encode ONLY new book
     emb = get_embedding(title)
     if emb is None:
         return
 
-    # save json
+    # save JSON
     _books_cache.append({"title": title})
     save_books(_books_cache)
 
-    # incremental FAISS add
+    # FAISS incremental add
     if _index is None:
-        _index = faiss.IndexFlatIP(384)
+        _index = faiss.IndexFlatIP(DIM)
 
     _index.add(np.array([emb[0]], dtype="float32"))
     faiss.write_index(_index, INDEX_FILE)
