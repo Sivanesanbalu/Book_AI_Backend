@@ -5,6 +5,9 @@ import asyncio
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
 
+# 🔥 IMPORTANT — preload AI models when server starts
+import startup
+
 from ocr import extract_text
 from search_engine import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
@@ -58,7 +61,7 @@ def best_match_from_candidates(candidates):
 
 
 # ==============================================================
-# 🔎 SCAN (ONLY DETECT)
+# 🔎 SCAN (ONLY DETECT — LIVE PREVIEW)
 # ==============================================================
 @app.post("/scan")
 async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -82,6 +85,7 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
         else:
             return {"status": "no_text"}
 
+        # stability memory
         memory = get_memory(uid)
         stable_title = memory.update(candidate_title)
 
@@ -114,7 +118,7 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
 
 
 # ==============================================================
-# 📸 CAPTURE (SAVE — WORKS EVEN WITHOUT SCAN)
+# 📸 CAPTURE (DETECT + SAVE — EVEN WITHOUT SCAN)
 # ==============================================================
 @app.post("/capture")
 async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -125,7 +129,7 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
         memory = get_memory(uid)
         final_title = memory.confirm()
 
-        # ---- IF USER DIDN'T SCAN → RUN OCR ONCE ----
+        # ---- If user didn't scan → run OCR once ----
         if not final_title:
 
             titles = await run_ocr(path)
