@@ -7,7 +7,7 @@ from threading import Lock
 from collections import OrderedDict
 
 # ---------------------------------------------------
-# INIT FIREBASE
+# INIT FIREBASE (ADMIN SDK — CORRECT)
 # ---------------------------------------------------
 if not firebase_admin._apps:
 
@@ -24,9 +24,8 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-
 # ---------------------------------------------------
-# SMART NORMALIZATION (OCR HARDENED)
+# NORMALIZE TITLE
 # ---------------------------------------------------
 def normalize_title(text: str) -> str:
     text = text.lower()
@@ -40,6 +39,7 @@ def normalize_title(text: str) -> str:
         "alg0rithm":"algorithm",
         "databse":"database"
     }
+
     for w,c in fixes.items():
         text = text.replace(w,c)
 
@@ -49,26 +49,22 @@ def normalize_title(text: str) -> str:
 
 
 # ---------------------------------------------------
-# FINGERPRINT ID (KEY FIX 🔥)
-# Same book -> same id even with OCR mistakes
+# FINGERPRINT (same book → same id)
 # ---------------------------------------------------
 def book_fingerprint(title: str) -> str:
-
     words = normalize_title(title).split()
-    words = sorted(set(words))[:6]   # stable tokens
-
+    words = sorted(set(words))[:6]
     key = " ".join(words)
     return hashlib.md5(key.encode()).hexdigest()
 
 
 # ---------------------------------------------------
-# LRU TTL CACHE
+# CACHE (FAST OWNED CHECK)
 # ---------------------------------------------------
 CACHE_TTL = timedelta(minutes=5)
 CACHE_LIMIT = 200
 _user_cache = OrderedDict()
 cache_lock = Lock()
-
 
 def load_user_books(user_id: str):
 
@@ -82,12 +78,10 @@ def load_user_books(user_id: str):
                 return titles
 
     docs = db.collection("users").document(user_id).collection("books").stream()
-
     titles = set(doc.to_dict()["title"] for doc in docs)
 
     with cache_lock:
         _user_cache[user_id] = (titles, now + CACHE_TTL)
-
         if len(_user_cache) > CACHE_LIMIT:
             _user_cache.popitem(last=False)
 
@@ -95,11 +89,12 @@ def load_user_books(user_id: str):
 
 
 # ---------------------------------------------------
-# SIMILARITY
+# SIMILARITY CHECK
 # ---------------------------------------------------
 def is_similar(a,b):
     if abs(len(a)-len(b)) > 12:
         return False
+
     return max(
         fuzz.token_set_ratio(a,b),
         fuzz.partial_ratio(a,b)
@@ -107,7 +102,21 @@ def is_similar(a,b):
 
 
 # ---------------------------------------------------
-# ATOMIC SAVE (FINAL FIXED VERSION)
+# CHECK USER OWNS BOOK
+# ---------------------------------------------------
+def user_has_book(user_id: str, title: str):
+    clean = normalize_title(title)
+    books = load_user_books(user_id)
+
+    for b in books:
+        if is_similar(clean, b):
+            return True
+
+    return False
+
+
+# ---------------------------------------------------
+# SAVE BOOK (FINAL — WORKING)
 # ---------------------------------------------------
 def save_book_for_user(user_id: str, title: str):
 
@@ -117,19 +126,28 @@ def save_book_for_user(user_id: str, title: str):
     user_ref = db.collection("users").document(user_id)
     doc_ref = user_ref.collection("books").document(fingerprint)
 
+    print("🔥 Trying save:", clean)
+
+    # ---------------------------
+    # 1️⃣ duplicate check OUTSIDE transaction
+    # ---------------------------
+    docs = user_ref.collection("books").stream()
+    for d in docs:
+        saved = d.to_dict()["title"]
+        if is_similar(clean, saved):
+            print("⚠️ Similar book exists — skip")
+            return False
+
+    # ---------------------------
+    # 2️⃣ atomic insert
+    # ---------------------------
     @firestore.transactional
     def txn(transaction):
 
-        # exact duplicate
-        if doc_ref.get(transaction=transaction).exists:
+        snapshot = doc_ref.get(transaction=transaction)
+        if snapshot.exists:
+            print("⚠️ Exact duplicate")
             return False
-
-        # fuzzy duplicate protection
-        docs = user_ref.collection("books").stream()
-        for d in docs:
-            saved = d.to_dict()["title"]
-            if is_similar(clean, saved):
-                return False
 
         transaction.set(doc_ref,{
             "title": clean,
@@ -141,8 +159,13 @@ def save_book_for_user(user_id: str, title: str):
     created = txn(db.transaction())
 
     if created:
+        print("✅ FIREBASE SAVED:", clean)
+
         with cache_lock:
             if user_id in _user_cache:
                 _user_cache[user_id][0].add(clean)
+
+    else:
+        print("❌ SAVE FAILED")
 
     return created
