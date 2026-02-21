@@ -60,7 +60,6 @@ def build_index():
     faiss.write_index(_index, INDEX_FILE)
 
     print("📚 FAISS index rebuilt:", len(vectors), "books")
-
     return _index
 
 
@@ -90,7 +89,6 @@ def search_book(text):
     query = clean_text(text)
     emb = get_embedding(query)
 
-    # ----- semantic search -----
     D, I = _index.search(emb, min(5, len(_books_cache)))
 
     best_book = None
@@ -101,20 +99,31 @@ def search_book(text):
         book = _books_cache[int(idx)]
         title = clean_text(book["title"])
 
-        semantic_score = float(sim)              # 0 → 1
-        fuzzy_score = fuzz.token_set_ratio(query, title) / 100  # 0 → 1
+        semantic_score = float(sim)
+        fuzzy_score = fuzz.token_set_ratio(query, title) / 100
 
-        # combined confidence
-        final_score = (semantic_score * 0.65) + (fuzzy_score * 0.35)
+        final_score = (semantic_score * 0.7) + (fuzzy_score * 0.3)
 
         if final_score > best_score:
             best_score = final_score
             best_book = book
 
-    if best_score < 0.55:
+    if best_score < 0.60:
         return None, best_score
 
     return best_book, best_score
+
+
+# ---------------- DUPLICATE CHECK ----------------
+def is_duplicate(title):
+
+    book, score = search_book(title)
+
+    if book and score > 0.72:
+        print("📗 Duplicate detected:", book["title"], "score:", score)
+        return True
+
+    return False
 
 
 # ---------------- ADD BOOK ----------------
@@ -124,13 +133,16 @@ def add_book(title):
 
     title = clean_text(title)
 
-    for b in _books_cache:
-        if clean_text(b["title"]) == title:
-            return
+    if len(title.split()) < 2:
+        print("⚠️ Ignored weak title:", title)
+        return
+
+    # 🔥 semantic duplicate detection
+    if is_duplicate(title):
+        return
 
     _books_cache.append({"title": title})
     save_books(_books_cache)
-
     build_index()
 
-    print("➕ Added book:", title)
+    print("➕ Added NEW book:", title)

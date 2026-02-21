@@ -1,4 +1,3 @@
-
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from threading import Lock
@@ -9,7 +8,7 @@ MODEL_NAME = "all-MiniLM-L6-v2"
 
 _model = None
 _model_lock = Lock()
-_encode_lock = Lock()   # prevents concurrent encode crash
+_encode_lock = Lock()
 
 
 # ---------------------------------------------------
@@ -75,7 +74,7 @@ def get_model():
                     device="cpu"
                 )
 
-                _model.max_seq_length = 32
+                _model.max_seq_length = 64
                 _model.eval()
 
                 print("✅ Embedding model loaded")
@@ -84,35 +83,31 @@ def get_model():
 
 
 # ---------------------------------------------------
-# SAFE ZERO VECTOR (fallback only)
+# SAFE ZERO VECTOR
 # ---------------------------------------------------
 def zero_vector():
-    vec = np.zeros((1, 384), dtype="float32")
-    vec[0][0] = 1e-6
-    return vec
+    return np.zeros((1, 384), dtype="float32")
 
 
 # ---------------------------------------------------
-# VALIDATE TEXT QUALITY (SOFT CHECK)
+# LIGHT QUALITY CHECK (DO NOT DESTROY TEXT)
 # ---------------------------------------------------
-def is_low_quality(text: str):
+def soft_filter(text: str):
 
     if not text:
-        return True
+        return ""
 
     words = text.split()
 
+    # keep at least 2 words
     if len(words) < 2:
-        return True
+        return text
 
-    digit_ratio = sum(c.isdigit() for c in text) / max(len(text),1)
-    if digit_ratio > 0.40:
-        return True
+    # trim too long OCR garbage
+    if len(text) > 120:
+        text = " ".join(words[:12])
 
-    if len(set(text)) < len(text) * 0.3:
-        return True
-
-    return False
+    return text
 
 
 # ---------------------------------------------------
@@ -124,13 +119,10 @@ def get_embedding(text: str) -> np.ndarray:
         return zero_vector()
 
     text = clean_text(text)
+    text = soft_filter(text)
 
-    # IMPORTANT: DO NOT reject — shorten instead
-    if is_low_quality(text):
-        text = text[:40]
-
-    # stabilize transformer
-    text = text[:80]
+    if not text:
+        return zero_vector()
 
     model = get_model()
 
@@ -142,8 +134,5 @@ def get_embedding(text: str) -> np.ndarray:
             batch_size=1,
             show_progress_bar=False
         ).astype("float32")
-
-    # reduce tiny OCR variations effect
-    emb = np.round(emb, 6)
 
     return emb
