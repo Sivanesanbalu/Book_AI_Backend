@@ -2,22 +2,26 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import hashlib
 import os
+import json
 
-# ---------------- INIT FIREBASE ----------------
+# ---------------- INIT FIREBASE (ENV BASED) ----------------
 if not firebase_admin._apps:
-    cred = credentials.Certificate("serviceAccountKey.json")
+    firebase_json = os.environ.get("FIREBASE_KEY")
+
+    if not firebase_json:
+        raise RuntimeError("FIREBASE_KEY environment variable not set")
+
+    cred_dict = json.loads(firebase_json)
+    cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
 
 # ------------------------------------------------
-# GENERATE SAFE BOOK ID (IMPORTANT)
+# GENERATE SAFE BOOK ID
 # ------------------------------------------------
 def book_id(title: str) -> str:
-    """
-    Create stable id independent of spaces / case / symbols
-    """
     normalized = title.lower().strip()
     return hashlib.md5(normalized.encode()).hexdigest()
 
@@ -51,7 +55,6 @@ def save_book_for_user(uid: str, title: str):
             .document(book_id(title))
         )
 
-        # prevent overwrite spam
         if doc_ref.get().exists:
             return False
 
