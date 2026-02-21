@@ -1,9 +1,14 @@
 import os
 import uuid
 import shutil
+import asyncio
+from threading import Lock
+from PIL import Image
+
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
 
+import startup
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
 
@@ -12,39 +17,67 @@ app = FastAPI()
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+MAX_FILE_SIZE = 4 * 1024 * 1024
+index_lock = Lock()
 
-# ------------------------------------------------
-# Save uploaded image safely
-# ------------------------------------------------
+
+@app.on_event("startup")
+def boot():
+    startup.start_ai()
+
+
+def validate_image(path: str):
+    try:
+        with Image.open(path) as img:
+            img.load()
+        return True
+    except:
+        return False
+
+
 def save_temp(file: UploadFile):
+    file.file.seek(0, 2)
+    size = file.file.tell()
+    file.file.seek(0)
+
+    if size > MAX_FILE_SIZE:
+        raise ValueError("file_too_large")
+
     path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}.jpg")
+
     with open(path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    file.file.close()   # ⭐ VERY IMPORTANT (prevents memory leak)
+
+    file.file.close()
     return path
 
 
-# ------------------------------------------------
-# CAPTURE ENDPOINT
-# ------------------------------------------------
 @app.post("/capture")
 async def capture(uid: str = Query(...), file: UploadFile = File(...)):
-
-    path = save_temp(file)
+    path = None
 
     try:
-        # STEP 1 — Try match existing book
-        book, score = search_book(path)
+        path = save_temp(file)
+    except ValueError:
+        return JSONResponse(status_code=413, content={"status": "file_too_large"})
+
+    if not validate_image(path):
+        if path and os.path.exists(path):
+            os.remove(path)
+        return JSONResponse(status_code=400, content={"status": "invalid_image"})
+
+    try:
+        book, score = await asyncio.wait_for(
+            asyncio.to_thread(search_book, path),
+            timeout=12
+        )
 
         if book is not None:
-
             title = book["title"]
 
-            # Already owned
             if user_has_book(uid, title):
                 return {"status": "owned", "title": title}
 
-            # Save only ownership
             save_book_for_user(uid, title)
 
             return {
@@ -53,12 +86,15 @@ async def capture(uid: str = Query(...), file: UploadFile = File(...)):
                 "confidence": round(float(score), 3)
             }
 
-        # STEP 2 — Unknown book → add safely
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
-        try:
-            add_book(path, unique_title)
-        except Exception as e:
+        with index_lock:
+            added = await asyncio.wait_for(
+                asyncio.to_thread(add_book, path, unique_title),
+                timeout=12
+            )
+
+        if not added:
             return JSONResponse(
                 status_code=500,
                 content={"status": "error", "message": "index_add_failed"}
@@ -71,12 +107,12 @@ async def capture(uid: str = Query(...), file: UploadFile = File(...)):
             "title": unique_title
         }
 
+    except asyncio.TimeoutError:
+        return JSONResponse(status_code=408, content={"status": "timeout"})
+
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
     finally:
-        if os.path.exists(path):
+        if path and os.path.exists(path):
             os.remove(path)

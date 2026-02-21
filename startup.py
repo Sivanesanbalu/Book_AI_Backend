@@ -1,6 +1,6 @@
 from image_embedder import warmup
 
-def start_ai():
+def startup_event():
     print("🚀 Starting AI system...")
 
     try:
