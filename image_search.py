@@ -8,7 +8,7 @@ from threading import Lock
 DATA_FILE = "data/books.json"
 INDEX_FILE = "data/books.faiss"
 
-DIM = 512
+DIM = 576
 MATCH_THRESHOLD = 0.88      # real world match
 DUPLICATE_THRESHOLD = 0.94  # exact same cover
 
