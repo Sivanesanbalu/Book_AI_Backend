@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from ocr import extract_text
 from search_engine import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
+from title_memory import get_memory   # ⭐ NEW IMPORT
 
 app = FastAPI()
 
@@ -60,7 +61,7 @@ def best_match_from_candidates(candidates):
 
 
 ############################################################
-# 🔎 SCAN — DETECT ONLY (NO SAVE)
+# 🔎 SCAN — STABLE DETECTION (NO SAVE)
 ############################################################
 @app.post("/scan")
 async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -70,46 +71,49 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
     try:
         titles = await run_ocr(path)
 
-        # 1️⃣ NO TEXT FOUND
         if not titles:
             return {"status": "no_text"}
 
         book, score, detected = best_match_from_candidates(titles)
 
-        # 2️⃣ FOUND IN GLOBAL DATABASE
+        # choose candidate
         if book:
-            clean_title = book["title"]
+            candidate_title = book["title"]
+            book_known = True
+        elif detected:
+            candidate_title = detected
+            book_known = False
+        else:
+            return {"status": "no_text"}
 
-            if user_has_book(uid, clean_title):
-                return {
-                    "status": "owned",
-                    "title": clean_title
-                }
+        # -------- TEMPORAL SMOOTHING --------
+        memory = get_memory(uid)
+        stable_title = memory.update(candidate_title)
 
+        # wait until camera stable
+        if not stable_title:
+            return {"status": "scanning"}
+
+        # -------- FINAL RESULT --------
+        if user_has_book(uid, stable_title):
+            return {
+                "status": "owned",
+                "title": stable_title
+            }
+
+        if book_known:
             return {
                 "status": "known_book",
-                "title": clean_title,
+                "title": stable_title,
                 "confidence": round(float(score), 3)
             }
 
-        # 3️⃣ OCR WORKED BUT BOOK NOT IN DATABASE ⭐ IMPORTANT
-        if detected:
-
-            if user_has_book(uid, detected):
-                return {
-                    "status": "owned",
-                    "title": detected
-                }
-
-            return {
-                "status": "detected",
-                "title": detected,
-                "confidence": round(float(score), 3),
-                "note": "New book (not in database)"
-            }
-
-        # fallback safety
-        return {"status": "no_text"}
+        return {
+            "status": "detected",
+            "title": stable_title,
+            "confidence": round(float(score), 3),
+            "note": "New book (not in database)"
+        }
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -135,11 +139,8 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
 
         book, score, detected = best_match_from_candidates(titles)
 
-        # GLOBAL BOOK EXISTS
         if book:
             final_title = book["title"]
-
-        # NEW BOOK → ADD TO GLOBAL DB
         else:
             final_title = detected
             if final_title:
@@ -148,14 +149,12 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
         if not final_title:
             return {"status": "failed"}
 
-        # ALREADY SAVED BY USER
         if user_has_book(uid, final_title):
             return {
                 "status": "already_saved",
                 "title": final_title
             }
 
-        # SAVE FOR USER
         save_book_for_user(uid, final_title)
 
         return {
