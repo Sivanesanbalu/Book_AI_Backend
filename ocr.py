@@ -18,7 +18,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# IMAGE PREPROCESS (BOOK COVER OPTIMIZED)
+# IMAGE PREPROCESS (REAL CAMERA OPTIMIZED)
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -26,24 +26,23 @@ def preprocess(path):
     if img is None:
         return None
 
-    # resize (consistent OCR scale)
+    # resize for OCR stability
     h, w = img.shape[:2]
-    scale = 1200 / max(h, w)
+    scale = 1400 / max(h, w)
     if scale < 1:
         img = cv2.resize(img, None, fx=scale, fy=scale)
 
-    # crop center region (titles usually center-top)
+    # focus on title area (top-middle)
     h, w = img.shape[:2]
-    crop = img[int(h*0.05):int(h*0.75), int(w*0.05):int(w*0.95)]
+    crop = img[int(h*0.05):int(h*0.65), int(w*0.05):int(w*0.95)]
 
-    # grayscale
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 
-    # CLAHE improves printed fonts
-    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8,8))
+    # contrast boost
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
     gray = clahe.apply(gray)
 
-    # light sharpening (keeps stylish fonts)
+    # sharpen
     kernel = np.array([[0,-1,0],[-1,5,-1],[0,-1,0]])
     sharp = cv2.filter2D(gray, -1, kernel)
 
@@ -51,33 +50,28 @@ def preprocess(path):
 
 
 # ---------------------------------------------------
-# FILTER NON-TITLE WORDS
+# FILTER BAD TEXT (SMART FILTER)
 # ---------------------------------------------------
 def is_bad_text(text):
 
     text_low = text.lower()
 
-    # too many numbers
-    if sum(c.isdigit() for c in text) > len(text) * 0.4:
+    if len(text_low) == 1 and text_low not in ["c","r"]:
         return True
 
-    # long numeric sequences (ISBN etc)
-    if re.search(r'\d{4,}', text):
+    # ignore ISBN / price heavy strings
+    if sum(c.isdigit() for c in text_low) > len(text_low)*0.6:
         return True
 
-    # publisher words
-    bad = ["edition","press","publisher","volume","vol","rs","inr","isbn","copyright"]
-    if any(w in text_low for w in bad):
-        return True
-
-    if len(text) < 2:
+    garbage = ["edition","press","publisher","volume","vol","isbn","copyright"]
+    if text_low in garbage:
         return True
 
     return False
 
 
 # ---------------------------------------------------
-# GROUP WORDS INTO LINES (DYNAMIC THRESHOLD)
+# GROUP WORDS INTO LINES
 # ---------------------------------------------------
 def group_lines(data, img_height):
 
@@ -86,9 +80,20 @@ def group_lines(data, img_height):
     for i in range(len(data["text"])):
 
         txt = data["text"][i].strip()
-        conf = int(data["conf"][i])
 
-        if conf < 60 or is_bad_text(txt):
+        if txt == "":
+            continue
+
+        try:
+            conf = int(data["conf"][i])
+        except:
+            continue
+
+        # 🔥 MOBILE CAMERA THRESHOLD
+        if conf < 35:
+            continue
+
+        if is_bad_text(txt):
             continue
 
         x = data["left"][i]
@@ -119,7 +124,7 @@ def group_lines(data, img_height):
 
 
 # ---------------------------------------------------
-# PICK BEST TITLE CANDIDATES
+# PICK TITLE CANDIDATES (REALISTIC SCORING)
 # ---------------------------------------------------
 def pick_titles(lines, img_height):
 
@@ -130,21 +135,21 @@ def pick_titles(lines, img_height):
         text = " ".join(w[0] for w in line)
         text = normalize(text)
 
-        word_count = len(text.split())
-        if word_count < 1:
+        words = text.split()
+        word_count = len(words)
+
+        # titles usually 2+ words
+        if word_count < 2:
             continue
 
-        # bigger text = title
         area = sum(w[3]*w[4] for w in line)
 
-        # higher position = title
         avg_y = sum(w[2] for w in line)/len(line)
         position_score = 1 - (avg_y/img_height)
 
-        # longer title bonus
-        length_bonus = min(word_count / 5, 2)
+        phrase_bonus = min(word_count * 0.8, 4)
 
-        score = area * (1.2 + position_score + length_bonus)
+        score = (area * 0.6) + (position_score * 8000) + (phrase_bonus * 5000)
 
         scored.append((text, score))
 
@@ -153,7 +158,6 @@ def pick_titles(lines, img_height):
 
     scored.sort(key=lambda x: x[1], reverse=True)
 
-    # remove duplicates
     results = []
     for text, _ in scored:
         if all(text not in r and r not in text for r in results):
@@ -178,7 +182,7 @@ def extract_text(path: str) -> list[str]:
 
         data = pytesseract.image_to_data(
             img,
-            config="--oem 3 --psm 11 -l eng",
+            config="--oem 3 --psm 6 -l eng",
             output_type=pytesseract.Output.DICT
         )
 
