@@ -1,12 +1,18 @@
-from image_embedder import warmup
+from image_embedder import get_image_embedding
+from PIL import Image
+import os
 
-def startup_event():
-    print("🚀 Starting AI system...")
+def start_ai():
+    print("🚀 Warming AI model...")
+
+    dummy = "warmup.jpg"
+
+    if not os.path.exists(dummy):
+        img = Image.new("RGB", (224, 224), color="white")
+        img.save(dummy)
 
     try:
-        warmup()
-        print("✅ Image AI Ready")
+        get_image_embedding(dummy)
+        print("✅ AI Ready")
     except Exception as e:
-        print("❌ AI startup failed:", e)
-
-    print("✅ Server ready")
+        print("❌ Warmup failed:", e)
