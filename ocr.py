@@ -8,6 +8,23 @@ import re
 
 
 # ---------------------------------------------------
+# ORDER POINTS (for perspective correction)
+# ---------------------------------------------------
+def order_points(pts):
+    rect = np.zeros((4,2), dtype="float32")
+
+    s = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+
+    diff = np.diff(pts, axis=1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+
+    return rect
+
+
+# ---------------------------------------------------
 # NORMALIZE TEXT
 # ---------------------------------------------------
 def normalize(text: str) -> str:
@@ -18,7 +35,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# IMAGE PREPROCESS (REAL CAMERA OPTIMIZED)
+# SMART BOOK DETECTION + PERSPECTIVE FIX
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -26,45 +43,92 @@ def preprocess(path):
     if img is None:
         return None
 
-    # resize for OCR stability
-    h, w = img.shape[:2]
-    scale = 1400 / max(h, w)
-    if scale < 1:
-        img = cv2.resize(img, None, fx=scale, fy=scale)
+    original = img.copy()
 
-    # focus on title area (top-middle)
-    h, w = img.shape[:2]
-    crop = img[int(h*0.05):int(h*0.65), int(w*0.05):int(w*0.95)]
+    # resize for contour detection
+    ratio = img.shape[0] / 800.0
+    img = cv2.resize(img, (int(img.shape[1]/ratio), 800))
 
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5,5), 0)
 
-    # contrast boost
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-    gray = clahe.apply(gray)
+    edged = cv2.Canny(gray, 50, 150)
 
-    # sharpen
-    kernel = np.array([[0,-1,0],[-1,5,-1],[0,-1,0]])
-    sharp = cv2.filter2D(gray, -1, kernel)
+    contours, _ = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
 
-    return sharp
+    book_contour = None
+
+    for c in contours:
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+
+        if len(approx) == 4:
+            book_contour = approx
+            break
+
+    # if book detected → flatten
+    if book_contour is not None:
+
+        pts = book_contour.reshape(4,2) * ratio
+        rect = order_points(pts)
+        (tl, tr, br, bl) = rect
+
+        widthA = np.linalg.norm(br - bl)
+        widthB = np.linalg.norm(tr - tl)
+        maxWidth = max(int(widthA), int(widthB))
+
+        heightA = np.linalg.norm(tr - br)
+        heightB = np.linalg.norm(tl - bl)
+        maxHeight = max(int(heightA), int(heightB))
+
+        dst = np.array([
+            [0,0],
+            [maxWidth-1,0],
+            [maxWidth-1,maxHeight-1],
+            [0,maxHeight-1]], dtype="float32")
+
+        M = cv2.getPerspectiveTransform(rect, dst)
+        warped = cv2.warpPerspective(original, M, (maxWidth, maxHeight))
+
+        gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+
+    else:
+        gray = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
+
+    # OCR optimized cleanup
+    gray = cv2.bilateralFilter(gray, 11, 17, 17)
+    gray = cv2.adaptiveThreshold(
+        gray,255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,31,2
+    )
+
+    return gray
 
 
 # ---------------------------------------------------
-# FILTER BAD TEXT (SMART FILTER)
+# FILTER BAD TEXT
 # ---------------------------------------------------
 def is_bad_text(text):
 
     text_low = text.lower()
 
-    if len(text_low) == 1 and text_low not in ["c","r"]:
+    if sum(c.isdigit() for c in text) > len(text)*0.4:
         return True
 
-    # ignore ISBN / price heavy strings
-    if sum(c.isdigit() for c in text_low) > len(text_low)*0.6:
+    if re.search(r'\d{4,}', text):
         return True
 
-    garbage = ["edition","press","publisher","volume","vol","isbn","copyright"]
-    if text_low in garbage:
+    bad_words = [
+        "edition","press","publisher","volume",
+        "vol","isbn","copyright","rs","inr"
+    ]
+
+    if any(w in text_low for w in bad_words):
+        return True
+
+    if len(text) < 2:
         return True
 
     return False
@@ -80,20 +144,9 @@ def group_lines(data, img_height):
     for i in range(len(data["text"])):
 
         txt = data["text"][i].strip()
+        conf = int(data["conf"][i])
 
-        if txt == "":
-            continue
-
-        try:
-            conf = int(data["conf"][i])
-        except:
-            continue
-
-        # 🔥 MOBILE CAMERA THRESHOLD
-        if conf < 35:
-            continue
-
-        if is_bad_text(txt):
+        if conf < 55 or is_bad_text(txt):
             continue
 
         x = data["left"][i]
@@ -112,8 +165,7 @@ def group_lines(data, img_height):
     current = [words[0]]
 
     for w in words[1:]:
-
-        if abs(w[2] - current[-1][2]) < img_height * 0.04:
+        if abs(w[2] - current[-1][2]) < img_height * 0.045:
             current.append(w)
         else:
             lines.append(current)
@@ -124,7 +176,7 @@ def group_lines(data, img_height):
 
 
 # ---------------------------------------------------
-# PICK TITLE CANDIDATES (REALISTIC SCORING)
+# PICK BEST TITLE
 # ---------------------------------------------------
 def pick_titles(lines, img_height):
 
@@ -135,10 +187,7 @@ def pick_titles(lines, img_height):
         text = " ".join(w[0] for w in line)
         text = normalize(text)
 
-        words = text.split()
-        word_count = len(words)
-
-        # titles usually 2+ words
+        word_count = len(text.split())
         if word_count < 2:
             continue
 
@@ -147,9 +196,9 @@ def pick_titles(lines, img_height):
         avg_y = sum(w[2] for w in line)/len(line)
         position_score = 1 - (avg_y/img_height)
 
-        phrase_bonus = min(word_count * 0.8, 4)
+        length_bonus = min(word_count/4, 2)
 
-        score = (area * 0.6) + (position_score * 8000) + (phrase_bonus * 5000)
+        score = area * (1.2 + position_score + length_bonus)
 
         scored.append((text, score))
 
@@ -189,7 +238,7 @@ def extract_text(path: str) -> list[str]:
         lines = group_lines(data, h)
         titles = pick_titles(lines, h)
 
-        print("OCR CANDIDATES:", titles)
+        print("📖 OCR TITLES:", titles)
 
         return titles
 
