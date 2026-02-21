@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from ocr import extract_text
 from search_engine import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
-from title_memory import get_memory   # ⭐ NEW IMPORT
+from title_memory import get_memory
 
 app = FastAPI()
 
@@ -17,20 +17,17 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ------------------------------------------------
-# SAVE TEMP FILE
+# SAVE TEMP IMAGE
 # ------------------------------------------------
 def save_temp_file(upload_file: UploadFile) -> str:
-    unique_name = f"{uuid.uuid4().hex}.jpg"
-    path = os.path.join(UPLOAD_DIR, unique_name)
-
+    path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}.jpg")
     with open(path, "wb") as buffer:
         shutil.copyfileobj(upload_file.file, buffer)
-
     return path
 
 
 # ------------------------------------------------
-# NON BLOCKING OCR
+# NON BLOCKING OCR (THREAD SAFE)
 # ------------------------------------------------
 async def run_ocr(path: str):
     loop = asyncio.get_event_loop()
@@ -60,9 +57,9 @@ def best_match_from_candidates(candidates):
     return best_book, best_score, best_text
 
 
-############################################################
-# 🔎 SCAN — STABLE DETECTION (NO SAVE)
-############################################################
+# ==============================================================
+# 🔎 SCAN  → ONLY DETECT (NO SAVE)
+# ==============================================================
 @app.post("/scan")
 async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
 
@@ -76,7 +73,7 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
 
         book, score, detected = best_match_from_candidates(titles)
 
-        # choose candidate
+        # decide candidate title
         if book:
             candidate_title = book["title"]
             book_known = True
@@ -86,11 +83,11 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
         else:
             return {"status": "no_text"}
 
-        # -------- TEMPORAL SMOOTHING --------
+        # -------- STABILITY MEMORY --------
         memory = get_memory(uid)
         stable_title = memory.update(candidate_title)
 
-        # wait until camera stable
+        # camera not steady yet
         if not stable_title:
             return {"status": "scanning"}
 
@@ -123,38 +120,33 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
             os.remove(path)
 
 
-############################################################
-# 📸 CAPTURE — SAVE BOOK
-############################################################
+# ==============================================================
+# 📸 CAPTURE → ONLY SAVE (NO OCR AGAIN)
+# ==============================================================
 @app.post("/capture")
 async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
 
     path = save_temp_file(file)
 
     try:
-        titles = await run_ocr(path)
+        memory = get_memory(uid)
+        final_title = memory.confirm()
 
-        if not titles:
-            return {"status": "failed"}
-
-        book, score, detected = best_match_from_candidates(titles)
-
-        if book:
-            final_title = book["title"]
-        else:
-            final_title = detected
-            if final_title:
-                add_book(final_title)
-
+        # ❗ user pressed save before stable detection
         if not final_title:
-            return {"status": "failed"}
+            return {"status": "scan_first"}
 
+        # already saved
         if user_has_book(uid, final_title):
             return {
                 "status": "already_saved",
                 "title": final_title
             }
 
+        # add to global DB (FAISS incremental)
+        add_book(final_title)
+
+        # add to user collection
         save_book_for_user(uid, final_title)
 
         return {

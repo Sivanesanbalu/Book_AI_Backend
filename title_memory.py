@@ -1,50 +1,48 @@
-from collections import deque, Counter
 import time
+from collections import deque
 
-# how many recent frames to remember
-WINDOW_SIZE = 8
-
-# how long same result must stay (seconds)
-STABLE_TIME = 0.7
-
+STABLE_FRAMES = 3
+TIMEOUT = 8  # seconds
 
 class TitleMemory:
 
     def __init__(self):
-        self.history = deque(maxlen=WINDOW_SIZE)
-        self.last_stable = None
-        self.last_change_time = time.time()
+        self.buffer = deque(maxlen=STABLE_FRAMES)
+        self.last_update = 0
+        self.locked_title = None
 
+    # called during scan
     def update(self, title: str):
 
         now = time.time()
-        self.history.append(title)
 
-        # count votes
-        counts = Counter(self.history)
-        best_title, votes = counts.most_common(1)[0]
+        # reset if user moved camera
+        if now - self.last_update > TIMEOUT:
+            self.buffer.clear()
+            self.locked_title = None
 
-        confidence = votes / len(self.history)
+        self.last_update = now
+        self.buffer.append(title)
 
-        # require majority vote
-        if confidence >= 0.6:
+        if len(self.buffer) < STABLE_FRAMES:
+            return None
 
-            if best_title != self.last_stable:
-                self.last_change_time = now
-                self.last_stable = best_title
-                return None  # wait for stability
-
-            # stable long enough
-            if now - self.last_change_time >= STABLE_TIME:
-                return best_title
+        # stable detection
+        if len(set(self.buffer)) == 1:
+            self.locked_title = title
+            return title
 
         return None
 
+    # called during capture
+    def confirm(self):
+        return self.locked_title
 
-# global memory per user
-user_memories = {}
+
+# memory per user
+_user_memory = {}
 
 def get_memory(uid: str):
-    if uid not in user_memories:
-        user_memories[uid] = TitleMemory()
-    return user_memories[uid]
+    if uid not in _user_memory:
+        _user_memory[uid] = TitleMemory()
+    return _user_memory[uid]

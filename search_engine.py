@@ -6,6 +6,9 @@ from rapidfuzz import fuzz
 
 from embedding import get_embedding, clean_text
 
+# IMPORTANT: prevent CPU overload
+faiss.omp_set_num_threads(1)
+
 DATA_FILE = "data/books.json"
 INDEX_FILE = "data/books.faiss"
 
@@ -34,7 +37,7 @@ def save_books(books):
         json.dump(books, f, indent=2)
 
 
-# ---------------- BUILD FAISS INDEX ----------------
+# ---------------- BUILD INDEX (ONLY ON STARTUP) ----------------
 def build_index():
 
     global _index
@@ -46,7 +49,6 @@ def build_index():
     for b in books:
         emb = get_embedding(b["title"])
 
-        # skip garbage titles
         if emb is None:
             continue
 
@@ -75,6 +77,7 @@ def load_index():
 
     if os.path.exists(INDEX_FILE):
         _index = faiss.read_index(INDEX_FILE)
+        print("⚡ FAISS index loaded instantly")
     else:
         build_index()
 
@@ -119,7 +122,6 @@ def search_book(text):
             best_score = score
             best_book = book
 
-    # STRICT threshold (prevents false positive)
     if best_score < 0.70:
         return None, best_score
 
@@ -138,10 +140,10 @@ def is_duplicate(title):
     return False
 
 
-# ---------------- ADD BOOK ----------------
+# ---------------- ⭐ INSTANT ADD (NO REBUILD) ----------------
 def add_book(title):
 
-    global _books_cache
+    global _books_cache, _index
 
     title = clean_text(title)
 
@@ -153,8 +155,20 @@ def add_book(title):
     if is_duplicate(title):
         return
 
+    # encode ONLY new book
+    emb = get_embedding(title)
+    if emb is None:
+        return
+
+    # save json
     _books_cache.append({"title": title})
     save_books(_books_cache)
-    build_index()
 
-    print("➕ Added:", title)
+    # incremental FAISS add
+    if _index is None:
+        _index = faiss.IndexFlatIP(384)
+
+    _index.add(np.array([emb[0]], dtype="float32"))
+    faiss.write_index(_index, INDEX_FILE)
+
+    print("➕ Added instantly:", title)
