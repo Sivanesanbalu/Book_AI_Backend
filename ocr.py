@@ -35,7 +35,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# SMART BOOK DETECTION + SAFE RESIZE
+# SMART BOOK DETECTION + MOBILE FALLBACK
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -45,9 +45,8 @@ def preprocess(path):
 
     original = img.copy()
 
-    # ---------------- SAFE RESIZE (IMPORTANT FIX)
+    # ---------- SAFE RESIZE (important for mobile images)
     max_dim = max(img.shape[0], img.shape[1])
-
     if max_dim > 1400:
         ratio = max_dim / 1400.0
         img = cv2.resize(img, (int(img.shape[1]/ratio), int(img.shape[0]/ratio)))
@@ -55,61 +54,61 @@ def preprocess(path):
     else:
         scale_ratio = 1.0
 
-    # ------------------------------------------------
+    # ---------- try perspective detection ----------
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (5,5), 0)
-    edged = cv2.Canny(gray, 50, 150)
+    blur = cv2.GaussianBlur(gray, (5,5), 0)
+    edged = cv2.Canny(blur, 60, 160)
 
     contours, _ = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
 
-    book_contour = None
+    warped = None
 
     for c in contours:
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.02 * peri, True)
 
         if len(approx) == 4:
-            book_contour = approx
+            pts = approx.reshape(4,2) * scale_ratio
+            rect = order_points(pts)
+
+            (tl, tr, br, bl) = rect
+            widthA = np.linalg.norm(br - bl)
+            widthB = np.linalg.norm(tr - tl)
+            maxWidth = max(int(widthA), int(widthB))
+
+            heightA = np.linalg.norm(tr - br)
+            heightB = np.linalg.norm(tl - bl)
+            maxHeight = max(int(heightA), int(heightB))
+
+            dst = np.array([
+                [0,0],
+                [maxWidth-1,0],
+                [maxWidth-1,maxHeight-1],
+                [0,maxHeight-1]], dtype="float32")
+
+            M = cv2.getPerspectiveTransform(rect, dst)
+            warped = cv2.warpPerspective(original, M, (maxWidth, maxHeight))
             break
 
-    # ------------------------------------------------
-    # Perspective correction
-    if book_contour is not None:
-
-        pts = book_contour.reshape(4,2) * scale_ratio
-        rect = order_points(pts)
-        (tl, tr, br, bl) = rect
-
-        widthA = np.linalg.norm(br - bl)
-        widthB = np.linalg.norm(tr - tl)
-        maxWidth = max(int(widthA), int(widthB))
-
-        heightA = np.linalg.norm(tr - br)
-        heightB = np.linalg.norm(tl - bl)
-        maxHeight = max(int(heightA), int(heightB))
-
-        dst = np.array([
-            [0,0],
-            [maxWidth-1,0],
-            [maxWidth-1,maxHeight-1],
-            [0,maxHeight-1]], dtype="float32")
-
-        M = cv2.getPerspectiveTransform(rect, dst)
-        warped = cv2.warpPerspective(original, M, (maxWidth, maxHeight))
-
-        gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-
-    else:
+    # ---------- MOBILE FALLBACK MODE ----------
+    if warped is None:
         gray = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
 
-    # ------------------------------------------------
-    # OCR optimized cleanup
-    gray = cv2.bilateralFilter(gray, 11, 17, 17)
+        h, w = gray.shape
+        gray = gray[int(h*0.18):int(h*0.60), int(w*0.08):int(w*0.92)]
+
+        # improve real-world lighting
+        gray = cv2.equalizeHist(gray)
+    else:
+        gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+
+    # ---------- OCR cleanup ----------
+    gray = cv2.bilateralFilter(gray, 9, 75, 75)
     gray = cv2.adaptiveThreshold(
         gray,255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,31,2
+        cv2.THRESH_BINARY,31,5
     )
 
     return gray
@@ -195,8 +194,7 @@ def pick_titles(lines, img_height):
         text = " ".join(w[0] for w in line)
         text = normalize(text)
 
-        word_count = len(text.split())
-        if word_count < 2:
+        if len(text.split()) < 2:
             continue
 
         area = sum(w[3]*w[4] for w in line)
@@ -204,14 +202,10 @@ def pick_titles(lines, img_height):
         avg_y = sum(w[2] for w in line)/len(line)
         position_score = 1 - (avg_y/img_height)
 
-        length_bonus = min(word_count/4, 2)
+        length_bonus = min(len(text.split())/4, 2)
 
         score = area * (1.2 + position_score + length_bonus)
-
         scored.append((text, score))
-
-    if not scored:
-        return []
 
     scored.sort(key=lambda x: x[1], reverse=True)
 
@@ -239,7 +233,7 @@ def extract_text(path: str) -> list[str]:
 
         data = pytesseract.image_to_data(
             img,
-            config="--oem 3 --psm 6 -l eng",
+            config="--oem 3 --psm 4 -l eng",
             output_type=pytesseract.Output.DICT
         )
 
