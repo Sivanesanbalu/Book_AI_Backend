@@ -1,17 +1,11 @@
 import os
-import shutil
 import uuid
-import asyncio
+import shutil
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
 
-# 🔥 preload models on startup
-import startup
-
-from ocr import extract_text
-from search_engine import search_book, add_book
+from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
-from title_memory import get_memory
 
 app = FastAPI()
 
@@ -20,160 +14,68 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ------------------------------------------------
-# SAVE TEMP IMAGE
+# Save uploaded image safely
 # ------------------------------------------------
-def save_temp_file(upload_file: UploadFile) -> str:
+def save_temp(file: UploadFile):
     path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}.jpg")
     with open(path, "wb") as buffer:
-        shutil.copyfileobj(upload_file.file, buffer)
+        shutil.copyfileobj(file.file, buffer)
+    file.file.close()   # ⭐ VERY IMPORTANT (prevents memory leak)
     return path
 
 
 # ------------------------------------------------
-# NON BLOCKING OCR
+# CAPTURE ENDPOINT
 # ------------------------------------------------
-async def run_ocr(path: str):
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, extract_text, path)
+@app.post("/capture")
+async def capture(uid: str = Query(...), file: UploadFile = File(...)):
 
-
-# ------------------------------------------------
-# FIND BEST MATCH FROM OCR
-# ------------------------------------------------
-def best_match_from_candidates(candidates):
-
-    best_book = None
-    best_score = 0
-    best_text = None
-
-    for text in candidates:
-        if not text or len(text) < 3:
-            continue
-
-        book, score = search_book(text)
-
-        if score > best_score:
-            best_book = book
-            best_score = score
-            best_text = text
-
-    return best_book, best_score, best_text
-
-
-# ==============================================================
-# 🔎 LIVE SCAN (PREVIEW ONLY)
-# ==============================================================
-@app.post("/scan")
-async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
-
-    path = save_temp_file(file)
+    path = save_temp(file)
 
     try:
-        titles = await run_ocr(path)
+        # STEP 1 — Try match existing book
+        book, score = search_book(path)
 
-        if not titles:
-            return {"status": "no_text"}
+        if book is not None:
 
-        book, score, detected = best_match_from_candidates(titles)
+            title = book["title"]
 
-        if book:
-            candidate_title = book["title"]
-            book_known = True
-        elif detected:
-            candidate_title = detected
-            book_known = False
-        else:
-            return {"status": "no_text"}
+            # Already owned
+            if user_has_book(uid, title):
+                return {"status": "owned", "title": title}
 
-        # ---- stability memory ----
-        memory = get_memory(uid)
-        stable_title = memory.update(candidate_title)
+            # Save only ownership
+            save_book_for_user(uid, title)
 
-        if not stable_title:
-            return {"status": "scanning"}
-
-        if user_has_book(uid, stable_title):
-            return {"status": "owned", "title": stable_title}
-
-        if book_known:
             return {
-                "status": "known_book",
-                "title": stable_title,
+                "status": "matched",
+                "title": title,
                 "confidence": round(float(score), 3)
             }
 
+        # STEP 2 — Unknown book → add safely
+        unique_title = f"Book_{uuid.uuid4().hex[:8]}"
+
+        try:
+            add_book(path, unique_title)
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": "index_add_failed"}
+            )
+
+        save_book_for_user(uid, unique_title)
+
         return {
-            "status": "detected",
-            "title": stable_title,
-            "confidence": round(float(score), 3),
-            "note": "New book"
+            "status": "new_book",
+            "title": unique_title
         }
 
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
-    finally:
-        if os.path.exists(path):
-            os.remove(path)
-
-
-# ==============================================================
-# 📸 CAPTURE (FINAL SAVE — ALWAYS WORKS)
-# ==============================================================
-@app.post("/capture")
-async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
-
-    path = save_temp_file(file)
-
-    try:
-        memory = get_memory(uid)
-        memory_title = memory.confirm()
-
-        # 🔥 ALWAYS RUN OCR
-        titles = await run_ocr(path)
-
-        detected_title = None
-        score = 0
-
-        if titles:
-            book, s, detected = best_match_from_candidates(titles)
-
-            if book:
-                detected_title = book["title"]
-                score = s
-            elif detected:
-                detected_title = detected
-
-        # -----------------------------
-        # SELECT FINAL TITLE
-        # -----------------------------
-        final_title = None
-
-        if detected_title and memory_title:
-            final_title = detected_title   # OCR wins
-        elif detected_title:
-            final_title = detected_title
-        elif memory_title:
-            final_title = memory_title
-        else:
-            return {"status": "no_text"}
-
-        print("📸 FINAL CAPTURE TITLE:", final_title)
-
-        # already exists
-        if user_has_book(uid, final_title):
-            return {"status": "already_saved", "title": final_title}
-
-        # add to global DB
-        add_book(final_title)
-
-        # save to firebase
-        save_book_for_user(uid, final_title)
-
-        return {"status": "saved", "title": final_title}
-
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
 
     finally:
         if os.path.exists(path):

@@ -1,9 +1,12 @@
-from embedder import get_model
-from search_engine import load_index
+from image_embedder import warmup
 
-print("🚀 Warming up AI models...")
+def start_ai():
+    print("🚀 Starting AI system...")
 
-get_model()      # loads sentence transformer
-load_index()     # loads FAISS index
+    try:
+        warmup()
+        print("✅ Image AI Ready")
+    except Exception as e:
+        print("❌ AI startup failed:", e)
 
-print("✅ Server ready")
+    print("✅ Server ready")
