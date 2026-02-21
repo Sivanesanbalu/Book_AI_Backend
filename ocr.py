@@ -5,10 +5,41 @@ import cv2
 import pytesseract
 import numpy as np
 import re
+from PIL import Image, ExifTags
 
 
 # ---------------------------------------------------
-# ORDER POINTS (for perspective correction)
+# FIX MOBILE ROTATION (VERY IMPORTANT)
+# ---------------------------------------------------
+def fix_rotation(path):
+    try:
+        image = Image.open(path)
+
+        for orientation in ExifTags.TAGS.keys():
+            if ExifTags.TAGS[orientation] == 'Orientation':
+                break
+
+        exif = image._getexif()
+        if exif is None:
+            return
+
+        orientation_value = exif.get(orientation, None)
+
+        if orientation_value == 3:
+            image = image.rotate(180, expand=True)
+        elif orientation_value == 6:
+            image = image.rotate(270, expand=True)
+        elif orientation_value == 8:
+            image = image.rotate(90, expand=True)
+
+        image.save(path)
+
+    except:
+        pass
+
+
+# ---------------------------------------------------
+# ORDER POINTS
 # ---------------------------------------------------
 def order_points(pts):
     rect = np.zeros((4,2), dtype="float32")
@@ -35,7 +66,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# SMART BOOK DETECTION + MOBILE FALLBACK
+# PREPROCESS IMAGE (REAL WORLD CAMERA READY)
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -45,7 +76,7 @@ def preprocess(path):
 
     original = img.copy()
 
-    # ---------- SAFE RESIZE (important for mobile images)
+    # SAFE RESIZE
     max_dim = max(img.shape[0], img.shape[1])
     if max_dim > 1400:
         ratio = max_dim / 1400.0
@@ -54,7 +85,7 @@ def preprocess(path):
     else:
         scale_ratio = 1.0
 
-    # ---------- try perspective detection ----------
+    # TRY BOOK RECTANGLE DETECTION
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5,5), 0)
     edged = cv2.Canny(blur, 60, 160)
@@ -91,19 +122,20 @@ def preprocess(path):
             warped = cv2.warpPerspective(original, M, (maxWidth, maxHeight))
             break
 
-    # ---------- MOBILE FALLBACK MODE ----------
+    # MOBILE FALLBACK (MOST IMPORTANT)
     if warped is None:
         gray = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
-
         h, w = gray.shape
+
+        # focus on title area
         gray = gray[int(h*0.18):int(h*0.60), int(w*0.08):int(w*0.92)]
 
-        # improve real-world lighting
+        # lighting correction
         gray = cv2.equalizeHist(gray)
     else:
         gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
 
-    # ---------- OCR cleanup ----------
+    # OCR CLEANUP
     gray = cv2.bilateralFilter(gray, 9, 75, 75)
     gray = cv2.adaptiveThreshold(
         gray,255,
@@ -115,7 +147,7 @@ def preprocess(path):
 
 
 # ---------------------------------------------------
-# FILTER BAD TEXT
+# TEXT FILTER
 # ---------------------------------------------------
 def is_bad_text(text):
 
@@ -183,7 +215,7 @@ def group_lines(data, img_height):
 
 
 # ---------------------------------------------------
-# PICK BEST TITLE
+# PICK TITLE
 # ---------------------------------------------------
 def pick_titles(lines, img_height):
 
@@ -225,6 +257,9 @@ def pick_titles(lines, img_height):
 def extract_text(path: str) -> list[str]:
 
     try:
+        # 🔥 critical step
+        fix_rotation(path)
+
         img = preprocess(path)
         if img is None:
             return []
