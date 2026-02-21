@@ -2,7 +2,7 @@ import time
 from collections import deque
 
 STABLE_FRAMES = 3
-TIMEOUT = 8  # seconds
+TIMEOUT = 25  # seconds
 
 class TitleMemory:
 

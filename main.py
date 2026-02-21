@@ -27,7 +27,7 @@ def save_temp_file(upload_file: UploadFile) -> str:
 
 
 # ------------------------------------------------
-# NON BLOCKING OCR (THREAD SAFE)
+# NON BLOCKING OCR
 # ------------------------------------------------
 async def run_ocr(path: str):
     loop = asyncio.get_event_loop()
@@ -35,7 +35,7 @@ async def run_ocr(path: str):
 
 
 # ------------------------------------------------
-# FIND BEST MATCH FROM OCR CANDIDATES
+# FIND BEST MATCH FROM OCR
 # ------------------------------------------------
 def best_match_from_candidates(candidates):
 
@@ -58,7 +58,7 @@ def best_match_from_candidates(candidates):
 
 
 # ==============================================================
-# 🔎 SCAN  → ONLY DETECT (NO SAVE)
+# 🔎 SCAN (ONLY DETECT)
 # ==============================================================
 @app.post("/scan")
 async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -73,7 +73,6 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
 
         book, score, detected = best_match_from_candidates(titles)
 
-        # decide candidate title
         if book:
             candidate_title = book["title"]
             book_known = True
@@ -83,20 +82,14 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
         else:
             return {"status": "no_text"}
 
-        # -------- STABILITY MEMORY --------
         memory = get_memory(uid)
         stable_title = memory.update(candidate_title)
 
-        # camera not steady yet
         if not stable_title:
             return {"status": "scanning"}
 
-        # -------- FINAL RESULT --------
         if user_has_book(uid, stable_title):
-            return {
-                "status": "owned",
-                "title": stable_title
-            }
+            return {"status": "owned", "title": stable_title}
 
         if book_known:
             return {
@@ -109,7 +102,7 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
             "status": "detected",
             "title": stable_title,
             "confidence": round(float(score), 3),
-            "note": "New book (not in database)"
+            "note": "New book"
         }
 
     except Exception as e:
@@ -121,7 +114,7 @@ async def scan_book(uid: str = Query(...), file: UploadFile = File(...)):
 
 
 # ==============================================================
-# 📸 CAPTURE → ONLY SAVE (NO OCR AGAIN)
+# 📸 CAPTURE (SAVE — WORKS EVEN WITHOUT SCAN)
 # ==============================================================
 @app.post("/capture")
 async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
@@ -132,27 +125,34 @@ async def capture_book(uid: str = Query(...), file: UploadFile = File(...)):
         memory = get_memory(uid)
         final_title = memory.confirm()
 
-        # ❗ user pressed save before stable detection
+        # ---- IF USER DIDN'T SCAN → RUN OCR ONCE ----
         if not final_title:
-            return {"status": "scan_first"}
+
+            titles = await run_ocr(path)
+
+            if not titles:
+                return {"status": "no_text"}
+
+            book, score, detected = best_match_from_candidates(titles)
+
+            if book:
+                final_title = book["title"]
+            elif detected:
+                final_title = detected
+            else:
+                return {"status": "no_text"}
 
         # already saved
         if user_has_book(uid, final_title):
-            return {
-                "status": "already_saved",
-                "title": final_title
-            }
+            return {"status": "already_saved", "title": final_title}
 
-        # add to global DB (FAISS incremental)
+        # add to global DB
         add_book(final_title)
 
-        # add to user collection
+        # save to firebase
         save_book_for_user(uid, final_title)
 
-        return {
-            "status": "saved",
-            "title": final_title
-        }
+        return {"status": "saved", "title": final_title}
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})

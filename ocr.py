@@ -35,7 +35,7 @@ def normalize(text: str) -> str:
 
 
 # ---------------------------------------------------
-# SMART BOOK DETECTION + PERSPECTIVE FIX
+# SMART BOOK DETECTION + SAFE RESIZE
 # ---------------------------------------------------
 def preprocess(path):
 
@@ -45,13 +45,19 @@ def preprocess(path):
 
     original = img.copy()
 
-    # resize for contour detection
-    ratio = img.shape[0] / 800.0
-    img = cv2.resize(img, (int(img.shape[1]/ratio), 800))
+    # ---------------- SAFE RESIZE (IMPORTANT FIX)
+    max_dim = max(img.shape[0], img.shape[1])
 
+    if max_dim > 1400:
+        ratio = max_dim / 1400.0
+        img = cv2.resize(img, (int(img.shape[1]/ratio), int(img.shape[0]/ratio)))
+        scale_ratio = ratio
+    else:
+        scale_ratio = 1.0
+
+    # ------------------------------------------------
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (5,5), 0)
-
     edged = cv2.Canny(gray, 50, 150)
 
     contours, _ = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -67,10 +73,11 @@ def preprocess(path):
             book_contour = approx
             break
 
-    # if book detected → flatten
+    # ------------------------------------------------
+    # Perspective correction
     if book_contour is not None:
 
-        pts = book_contour.reshape(4,2) * ratio
+        pts = book_contour.reshape(4,2) * scale_ratio
         rect = order_points(pts)
         (tl, tr, br, bl) = rect
 
@@ -96,6 +103,7 @@ def preprocess(path):
     else:
         gray = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
 
+    # ------------------------------------------------
     # OCR optimized cleanup
     gray = cv2.bilateralFilter(gray, 11, 17, 17)
     gray = cv2.adaptiveThreshold(
