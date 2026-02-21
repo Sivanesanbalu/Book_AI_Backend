@@ -13,21 +13,21 @@ DB_PATH = os.path.join(DATA_DIR, "books_db.json")
 
 DIM = 384
 
-# tuned for OCR noise
-SEMANTIC_ACCEPT = 0.65
-FALLBACK_ACCEPT = 120
-STRONG_DUPLICATE = 0.70
-STRING_MIN = 70
+# tuned thresholds for book titles
+SEMANTIC_THRESHOLD = 0.72
+STRONG_DUPLICATE = 0.80
+STRING_THRESHOLD = 85
 
 lock = Lock()
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# ---------------- GLOBAL CACHE ----------------
 _index = None
 _books_cache = None
 
 
 # ---------------- TEXT NORMALIZATION ----------------
-def normalize_text(text: str):
+def normalize_text(text: str) -> str:
     text = text.lower()
     text = re.sub(r'[^a-z0-9 ]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
@@ -58,9 +58,10 @@ def save_db(data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-# ---------------- BUILD INDEX ----------------
+# ---------------- BUILD INDEX (COSINE SIMILARITY) ----------------
 def build_index(books):
 
+    # cosine similarity index
     index = faiss.IndexHNSWFlat(DIM, 32, faiss.METRIC_INNER_PRODUCT)
     index.hnsw.efSearch = 80
     index.hnsw.efConstruction = 40
@@ -69,8 +70,10 @@ def build_index(books):
         return index
 
     embeddings = []
+
     for b in books:
-        embeddings.append(get_embedding(b["title"]))
+        emb = get_embedding(b["title"])
+        embeddings.append(emb)
 
     embeddings = np.vstack(embeddings).astype("float32")
     index.add(embeddings)
@@ -78,7 +81,7 @@ def build_index(books):
     return index
 
 
-# ---------------- LOAD INDEX SAFELY ----------------
+# ---------------- SAFE INDEX LOAD ----------------
 def load_index():
     global _index
 
@@ -91,22 +94,25 @@ def load_index():
     if os.path.exists(INDEX_PATH):
         try:
             idx = faiss.read_index(INDEX_PATH)
+
+            # important safety check
             if idx.ntotal == len(books):
                 _index = idx
                 rebuild = False
-                print("FAISS loaded")
+                print("FAISS index loaded from disk")
+
         except:
             pass
 
     if rebuild:
-        print("Rebuilding FAISS index")
+        print("Rebuilding FAISS index safely...")
         _index = build_index(books)
         faiss.write_index(_index, INDEX_PATH)
 
     return _index
 
 
-# ---------------- SEARCH BOOK (FIXED) ----------------
+# ---------------- SEARCH BOOK ----------------
 def search_book(text: str):
 
     text = normalize_text(text)
@@ -121,44 +127,33 @@ def search_book(text: str):
     index = load_index()
 
     query = get_embedding(text)
+    D, I = index.search(query, 1)
 
-    # 🔥 search top 3 candidates
-    k = min(3, len(books))
-    D, I = index.search(query, k)
+    similarity = float(D[0][0])
+    idx = int(I[0][0])
 
-    best_match = None
-    best_score = 0
+    if idx < 0 or idx >= len(books):
+        return None, 0.0
 
-    for rank in range(k):
+    # semantic filter
+    if similarity < SEMANTIC_THRESHOLD:
+        return None, similarity
 
-        idx = int(I[0][rank])
-        if idx < 0 or idx >= len(books):
-            continue
+    stored_title = books[idx]["title"]
 
-        similarity = float(D[0][rank])
-        stored_title = books[idx]["title"]
+    # string verification (prevents color / design confusion)
+    string_score = fuzz.token_sort_ratio(text, stored_title)
 
-        string_score = fuzz.token_set_ratio(text, stored_title)
+    if string_score < STRING_THRESHOLD:
+        return None, similarity
 
-        # -------- Primary Accept --------
-        if similarity >= SEMANTIC_ACCEPT and string_score >= STRING_MIN:
-            return books[idx], similarity
-
-        # -------- Fallback Score --------
-        combined = similarity * 100 + string_score
-        if combined > best_score:
-            best_score = combined
-            best_match = (books[idx], similarity)
-
-    # -------- Final fallback --------
-    if best_match and best_score > FALLBACK_ACCEPT:
-        return best_match
-
-    return None, 0.0
+    return books[idx], similarity
 
 
 # ---------------- ADD BOOK ----------------
 def add_book(title: str):
+
+    global _index
 
     title = normalize_text(title)
     if len(title) < 3:
@@ -168,17 +163,17 @@ def add_book(title: str):
 
         books = load_db()
 
-        # check duplicate
+        # semantic duplicate protection
         existing, sim = search_book(title)
         if existing and sim > STRONG_DUPLICATE:
             return existing
 
         # strong string duplicate
         for b in books:
-            if fuzz.token_set_ratio(title, b["title"]) > 92:
+            if fuzz.token_sort_ratio(title, b["title"]) > 92:
                 return b
 
-        # add new
+        # add new book
         books.append({"title": title})
         save_db(books)
 
