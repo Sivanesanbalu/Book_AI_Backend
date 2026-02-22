@@ -1,10 +1,11 @@
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
 import hashlib
 import os
 import json
+import re
 
-# ---------------- INIT FIREBASE (ENV BASED) ----------------
+# ---------------- INIT FIREBASE ----------------
 if not firebase_admin._apps:
     firebase_json = os.environ.get("FIREBASE_KEY")
 
@@ -18,17 +19,40 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 
-# ------------------------------------------------
-# GENERATE SAFE BOOK ID
-# ------------------------------------------------
+# =========================================================
+# 🔐 VERIFY USER TOKEN  (CRITICAL FIX)
+# =========================================================
+def verify_user(id_token: str):
+    """
+    Verify Firebase ID token from Flutter Authorization header
+    Returns uid or None
+    """
+    try:
+        decoded = auth.verify_id_token(id_token)
+        return decoded["uid"]
+    except Exception as e:
+        print("🔥 Token verification failed:", e)
+        return None
+
+
+# =========================================================
+# 📚 NORMALIZE TITLE (PREVENT DUPLICATES)
+# Harry Potter == harry-potter == HARRY POTTER
+# =========================================================
+def normalize_title(title: str) -> str:
+    title = title.lower().strip()
+    title = re.sub(r'[^a-z0-9]', '', title)  # remove spaces & symbols
+    return title
+
+
 def book_id(title: str) -> str:
-    normalized = title.lower().strip()
+    normalized = normalize_title(title)
     return hashlib.md5(normalized.encode()).hexdigest()
 
 
-# ----------------------------------------
-# CHECK USER ALREADY HAS BOOK
-# ----------------------------------------
+# =========================================================
+# 🔍 CHECK USER HAS BOOK
+# =========================================================
 def user_has_book(uid: str, title: str) -> bool:
     try:
         doc_ref = (
@@ -38,15 +62,20 @@ def user_has_book(uid: str, title: str) -> bool:
             .document(book_id(title))
         )
         return doc_ref.get().exists
+
     except Exception as e:
         print("🔥 Firebase check error:", e)
         return False
 
 
-# ----------------------------------------
-# SAVE BOOK FOR USER
-# ----------------------------------------
+# =========================================================
+# 💾 SAVE BOOK FOR USER (ATOMIC — NO DUPLICATES)
+# =========================================================
 def save_book_for_user(uid: str, title: str):
+    """
+    Atomic save → Firestore document ID prevents duplicates automatically
+    """
+
     try:
         doc_ref = (
             db.collection("users")
@@ -55,13 +84,12 @@ def save_book_for_user(uid: str, title: str):
             .document(book_id(title))
         )
 
-        if doc_ref.get().exists:
-            return False
-
+        # merge=True prevents overwrite + avoids race condition
         doc_ref.set({
             "title": title,
+            "normalized": normalize_title(title),
             "createdAt": firestore.SERVER_TIMESTAMP
-        })
+        }, merge=True)
 
         print(f"📘 Saved for user {uid}: {title}")
         return True

@@ -21,11 +21,13 @@ MAX_FILE_SIZE = 4 * 1024 * 1024
 index_lock = Lock()
 
 
+# ---------------- STARTUP ----------------
 @app.on_event("startup")
 def boot():
     startup.start_ai()
 
 
+# ---------------- IMAGE VALIDATION ----------------
 def validate_image(path: str):
     try:
         with Image.open(path) as img:
@@ -35,6 +37,7 @@ def validate_image(path: str):
         return False
 
 
+# ---------------- SAVE TEMP FILE ----------------
 def save_temp(file: UploadFile):
     file.file.seek(0, 2)
     size = file.file.tell()
@@ -52,27 +55,33 @@ def save_temp(file: UploadFile):
     return path
 
 
+# ---------------- CAPTURE API ----------------
 @app.post("/capture")
 async def capture(uid: str = Query(...), file: UploadFile = File(...)):
     path = None
 
+    # ---------- SAVE FILE ----------
     try:
         path = save_temp(file)
     except ValueError:
         return JSONResponse(status_code=413, content={"status": "file_too_large"})
 
     if not validate_image(path):
-        if path and os.path.exists(path):
+        if os.path.exists(path):
             os.remove(path)
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
+        # ---------- SEARCH BOOK ----------
         book, score = await asyncio.wait_for(
             asyncio.to_thread(search_book, path),
             timeout=12
         )
 
-        if book is not None:
+        # ============================================================
+        # STRONG MATCH (definitely same book)
+        # ============================================================
+        if book is not None and score >= 0.82:
             title = book["title"]
 
             if user_has_book(uid, title):
@@ -86,6 +95,27 @@ async def capture(uid: str = Query(...), file: UploadFile = File(...)):
                 "confidence": round(float(score), 3)
             }
 
+        # ============================================================
+        # WEAK MATCH (real-world variation: lighting/distance/angle)
+        # DO NOT ADD AGAIN
+        # ============================================================
+        if book is not None and 0.70 <= score < 0.82:
+            title = book["title"]
+
+            if user_has_book(uid, title):
+                return {"status": "owned", "title": title}
+
+            save_book_for_user(uid, title)
+
+            return {
+                "status": "matched_weak",
+                "title": title,
+                "confidence": round(float(score), 3)
+            }
+
+        # ============================================================
+        # NEW BOOK (only here we add)
+        # ============================================================
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
         with index_lock:
@@ -95,10 +125,7 @@ async def capture(uid: str = Query(...), file: UploadFile = File(...)):
             )
 
         if not added:
-            return JSONResponse(
-                status_code=500,
-                content={"status": "error", "message": "index_add_failed"}
-            )
+            return {"status": "duplicate_prevented"}
 
         save_book_for_user(uid, unique_title)
 

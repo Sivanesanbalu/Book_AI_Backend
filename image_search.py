@@ -9,8 +9,10 @@ DATA_FILE = "data/books.json"
 INDEX_FILE = "data/books.faiss"
 
 DIM = 576
-MATCH_THRESHOLD = 0.88      # real world match
-DUPLICATE_THRESHOLD = 0.94  # exact same cover
+
+# tuned real world thresholds
+MATCH_THRESHOLD = 0.72      # detect same book
+DUPLICATE_THRESHOLD = 0.87  # prevent re-adding same cover
 
 os.makedirs("data", exist_ok=True)
 
@@ -19,7 +21,12 @@ _index = None
 _lock = Lock()
 
 
-# ---------------- SAFE LOAD ----------------
+# ---------------- NORMALIZE (VERY IMPORTANT) ----------------
+def normalize(v):
+    return v / np.linalg.norm(v, axis=1, keepdims=True)
+
+
+# ---------------- REBUILD INDEX ----------------
 def rebuild_index():
     global _index
 
@@ -32,14 +39,18 @@ def rebuild_index():
 
     for b in _books:
         if "embedding" in b:
-            vectors.append(np.array(b["embedding"], dtype="float32"))
+            vec = np.array(b["embedding"], dtype="float32").reshape(1, -1)
+            vec = normalize(vec)
+            vectors.append(vec[0])
 
     if len(vectors):
         _index.add(np.stack(vectors))
 
 
+# ---------------- LOAD DB ----------------
 def load_db():
     global _books
+
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
             _books = json.load(f)
@@ -49,6 +60,7 @@ def load_db():
     rebuild_index()
 
 
+# ---------------- SAVE DB ----------------
 def save_db():
     tmp = DATA_FILE + ".tmp"
     with open(tmp, "w") as f:
@@ -59,7 +71,7 @@ def save_db():
 load_db()
 
 
-# ---------------- SEARCH ----------------
+# ---------------- SEARCH BOOK ----------------
 def search_book(image_path):
 
     if _index.ntotal == 0:
@@ -68,6 +80,8 @@ def search_book(image_path):
     emb = get_image_embedding(image_path)
     if emb is None:
         return None, 0
+
+    emb = normalize(emb)
 
     D, I = _index.search(emb, 1)
 
@@ -83,7 +97,7 @@ def search_book(image_path):
     return _books[idx], score
 
 
-# ---------------- ADD ----------------
+# ---------------- ADD BOOK ----------------
 def add_book(image_path, title):
 
     global _index
@@ -92,16 +106,18 @@ def add_book(image_path, title):
     if emb is None:
         return False
 
+    emb = normalize(emb)
+
     with _lock:
 
         # duplicate detection
         if _index.ntotal > 0:
             D, _ = _index.search(emb, 1)
             if float(D[0][0]) > DUPLICATE_THRESHOLD:
-                print("⚠️ Duplicate book ignored")
-                return False
+                print("⚠️ Already exists → not adding again")
+                return True   # IMPORTANT FIX
 
-        # store embedding INSIDE JSON (very important)
+        # save embedding
         _books.append({
             "title": title,
             "embedding": emb.flatten().tolist()
@@ -109,7 +125,7 @@ def add_book(image_path, title):
 
         save_db()
 
-        # rebuild index (guaranteed sync)
+        # sync index
         rebuild_index()
 
     print("➕ Added:", title)

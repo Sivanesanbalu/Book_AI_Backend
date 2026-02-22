@@ -1,67 +1,75 @@
-from PIL import Image
 import torch
-import torchvision.models as models
-import torchvision.transforms as T
-from threading import Lock
 import numpy as np
+from PIL import Image, ImageEnhance
+from torchvision import transforms
+import timm
 
+# -------- MODEL LOAD --------
 device = "cpu"
 
-_model = None
-_preprocess = None
-_model_lock = Lock()
+model = timm.create_model("tf_efficientnetv2_b0", pretrained=True, num_classes=0)
+model.eval()
+model.to(device)
 
-def load_model():
-    global _model, _preprocess
 
-    print("🔄 Loading lightweight vision model...")
+# -------- IMAGE TRANSFORM --------
+transform = transforms.Compose([
+    transforms.Resize((256, 256)),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    )
+])
 
-    model = models.mobilenet_v3_small(weights="IMAGENET1K_V1")
-    model.classifier = torch.nn.Identity()
-    model.eval()
 
-    _model = model.to(device)
+# -------- NORMALIZE VECTOR --------
+def normalize(v):
+    return v / np.linalg.norm(v, axis=1, keepdims=True)
 
-    _preprocess = T.Compose([
-        T.Resize((224,224)),
-        T.ToTensor(),
-        T.Normalize(mean=[0.485,0.456,0.406],
-                    std=[0.229,0.224,0.225])
-    ])
 
-    print("✅ Vision model ready")
+# -------- PREPROCESS --------
+def enhance(img: Image.Image):
+    img = img.convert("RGB")
 
-def warmup():
-    if _model is None:
-        with _model_lock:
-            if _model is None:
-                load_model()
+    # contrast stabilize (very important)
+    img = ImageEnhance.Contrast(img).enhance(1.4)
+    img = ImageEnhance.Sharpness(img).enhance(1.2)
 
-                img = Image.new("RGB",(224,224),"white")
-                t = _preprocess(img).unsqueeze(0)
+    return img
 
-                with torch.no_grad():
-                    _model(t)
 
-def get_image_embedding(path:str):
+# -------- MULTI VIEW EMBEDDING --------
+def extract(img):
+    img = transform(img).unsqueeze(0).to(device)
+    with torch.no_grad():
+        emb = model(img).cpu().numpy().astype("float32")
+    return emb
 
-    global _model
 
-    if _model is None:
-        warmup()
+def get_image_embedding(path):
 
     try:
-        with Image.open(path) as img:
-            img = img.convert("RGB")
-            t = _preprocess(img).unsqueeze(0)
+        base = Image.open(path)
+        base = enhance(base)
 
-        with torch.no_grad():
-            emb = _model(t)
+        embeddings = []
 
-        emb = emb / emb.norm(dim=-1, keepdim=True)
+        # 4 angle views (REAL WORLD FIX)
+        for angle in [0, 90, 180, 270]:
+            img = base.rotate(angle, expand=True)
+            embeddings.append(extract(img))
 
-        return emb.cpu().numpy().astype("float32")
+        # slight zoom crop
+        w, h = base.size
+        crop = base.crop((w*0.1, h*0.1, w*0.9, h*0.9))
+        embeddings.append(extract(crop))
+
+        emb = np.mean(np.vstack(embeddings), axis=0, keepdims=True)
+
+        return normalize(emb)
 
     except Exception as e:
-        print("embedding error:",e)
+        print("Embedding error:", e)
         return None
