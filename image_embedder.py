@@ -3,46 +3,80 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 import timm
+import os
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+# ---------------- MEMORY SAFE SETTINGS ----------------
+torch.set_num_threads(1)
+torch.backends.mkldnn.enabled = False
 
 device = "cpu"
 
-# Better for similarity tasks than efficientnetv2
-model = timm.create_model("convnext_base", pretrained=True, num_classes=0)
+# -------- LIGHTWEIGHT BUT ACCURATE MODEL --------
+model = timm.create_model("convnext_tiny", pretrained=True, num_classes=0)
 model.eval()
 model.to(device)
 
 
+# -------- TRANSFORM --------
 transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
     transforms.Normalize(
-        mean=[0.5, 0.5, 0.5],
-        std=[0.5, 0.5, 0.5]
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
     )
 ])
 
 
+# -------- NORMALIZE VECTOR --------
 def normalize(v):
-    return v / np.linalg.norm(v, axis=1, keepdims=True)
+    norm = np.linalg.norm(v, axis=1, keepdims=True)
+    norm[norm == 0] = 1e-8
+    return v / norm
+
+
+# -------- LIGHTING NORMALIZATION --------
+def remove_lighting(img):
+    arr = np.array(img).astype("float32")
+    mean = arr.mean()
+    arr = (arr - mean) * 1.15 + 128
+    arr = np.clip(arr, 0, 255)
+    return Image.fromarray(arr.astype("uint8"))
+
+
+# -------- EMBEDDING --------
+def extract(img):
+    tensor = transform(img).unsqueeze(0).to(device)
+    with torch.no_grad():
+        emb = model(tensor).cpu().numpy().astype("float32")
+    return emb
 
 
 def get_image_embedding(path):
     try:
-        img = Image.open(path).convert("RGB")
+        # safe open (prevents memory leak)
+        img = Image.open(path)
+        img.load()
+        img = img.convert("RGB")
+        img = img.copy()
 
-        # VERY IMPORTANT — remove lighting differences
-        img = Image.fromarray(
-            np.uint8(
-                (np.array(img) - np.array(img).mean()) * 1.2 + 128
-            ).clip(0,255)
-        )
+        # remove lighting differences
+        img = remove_lighting(img)
 
-        tensor = transform(img).unsqueeze(0).to(device)
+        embeddings = []
 
-        with torch.no_grad():
-            emb = model(tensor).cpu().numpy().astype("float32")
+        # original
+        embeddings.append(extract(img))
 
+        # slight zoom crop (real world camera variation)
+        w, h = img.size
+        crop = img.crop((w*0.12, h*0.12, w*0.88, h*0.88))
+        embeddings.append(extract(crop))
+
+        emb = np.mean(np.vstack(embeddings), axis=0, keepdims=True)
+
+        del img
         return normalize(emb)
 
     except Exception as e:

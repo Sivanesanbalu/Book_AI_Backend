@@ -55,12 +55,13 @@ def save_temp(file: UploadFile):
     return path
 
 
-# ---------------- CAPTURE API ----------------
-@app.post("/capture")
-async def capture(uid: str = Query(...), file: UploadFile = File(...)):
+# =========================================================
+# 🔍 SCAN BOOK  (SEARCH ONLY — NEVER SAVES)
+# =========================================================
+@app.post("/scan")
+async def scan(uid: str = Query(...), file: UploadFile = File(...)):
     path = None
 
-    # ---------- SAVE FILE ----------
     try:
         path = save_temp(file)
     except ValueError:
@@ -72,70 +73,70 @@ async def capture(uid: str = Query(...), file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
-        # ---------- SEARCH BOOK ----------
-        book, score = await asyncio.wait_for(
-            asyncio.to_thread(search_book, path),
-            timeout=12
-        )
+        book, score = await asyncio.to_thread(search_book, path)
 
-        # ============================================================
-        # STRONG MATCH (definitely same book)
-        # ============================================================
-        if book is not None and score >= 0.82:
+        if book is None:
+            return {"status": "not_found"}
+
+        title = book["title"]
+
+        if user_has_book(uid, title):
+            return {"status": "owned", "title": title}
+
+        return {
+            "status": "found",
+            "title": title,
+            "confidence": round(float(score), 3)
+        }
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+    finally:
+        if path and os.path.exists(path):
+            os.remove(path)
+
+
+# =========================================================
+# 📷 ADD BOOK  (FORCE SAVE / LEARN)
+# =========================================================
+@app.post("/add")
+async def add(uid: str = Query(...), file: UploadFile = File(...)):
+    path = None
+
+    try:
+        path = save_temp(file)
+    except ValueError:
+        return JSONResponse(status_code=413, content={"status": "file_too_large"})
+
+    if not validate_image(path):
+        if os.path.exists(path):
+            os.remove(path)
+        return JSONResponse(status_code=400, content={"status": "invalid_image"})
+
+    try:
+        # check already exists in AI DB
+        book, score = await asyncio.to_thread(search_book, path)
+
+        # ---------- ALREADY KNOWN BOOK ----------
+        if book is not None:
             title = book["title"]
 
             if user_has_book(uid, title):
-                return {"status": "owned", "title": title}
+                return {"status": "already_saved", "title": title}
 
             save_book_for_user(uid, title)
+            return {"status": "saved_existing", "title": title}
 
-            return {
-                "status": "matched",
-                "title": title,
-                "confidence": round(float(score), 3)
-            }
-
-        # ============================================================
-        # WEAK MATCH (real-world variation: lighting/distance/angle)
-        # DO NOT ADD AGAIN
-        # ============================================================
-        if book is not None and 0.70 <= score < 0.82:
-            title = book["title"]
-
-            if user_has_book(uid, title):
-                return {"status": "owned", "title": title}
-
-            save_book_for_user(uid, title)
-
-            return {
-                "status": "matched_weak",
-                "title": title,
-                "confidence": round(float(score), 3)
-            }
-
-        # ============================================================
-        # NEW BOOK (only here we add)
-        # ============================================================
+        # ---------- NEW BOOK ----------
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
         with index_lock:
-            added = await asyncio.wait_for(
-                asyncio.to_thread(add_book, path, unique_title),
-                timeout=12
-            )
-
-        if not added:
-            return {"status": "duplicate_prevented"}
+            await asyncio.to_thread(add_book, path, unique_title)
 
         save_book_for_user(uid, unique_title)
 
-        return {
-            "status": "new_book",
-            "title": unique_title
-        }
-
-    except asyncio.TimeoutError:
-        return JSONResponse(status_code=408, content={"status": "timeout"})
+        return {"status": "saved_new", "title": unique_title}
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})

@@ -8,7 +8,7 @@ from threading import Lock
 DATA_FILE = "data/books.json"
 INDEX_FILE = "data/books.faiss"
 
-DIM = 576
+DIM = 768
 
 # tuned real world thresholds
 MATCH_THRESHOLD = 0.72      # detect same book
