@@ -1,5 +1,6 @@
 import requests
 import os
+import time
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
@@ -9,7 +10,7 @@ def generate_book_reply(book_name, topic, user_question):
     if not user_question:
         user_question = "Explain this book"
 
-    # 🧠 SMART PROMPT
+    # ---------- PROMPT ----------
     prompt = f"""
 You are a friendly teacher helping a student understand a book.
 
@@ -28,13 +29,14 @@ Instructions:
 - Teach like a school teacher
 
 Structure:
-1) Small direct answer to the question
+1) Small direct answer
 2) What this book teaches
 3) Who should read it
 4) What student will learn
-5) Why it is useful in real life
+5) Real life usage
 """
 
+    # ---------- IF NO API KEY ----------
     if not GROQ_API_KEY:
         return fallback_summary(book_name, topic)
 
@@ -46,7 +48,7 @@ Structure:
     }
 
     data = {
-        "model": "llama-3.1-8b-instant",   # ✅ NEW MODEL
+        "model": "llama3-70b-8192",
         "messages": [
             {"role": "system", "content": "You are a helpful educational book assistant."},
             {"role": "user", "content": prompt}
@@ -55,8 +57,14 @@ Structure:
         "max_tokens": 450
     }
 
+    # ---------- REQUEST WITH RETRY ----------
     try:
-        r = requests.post(url, headers=headers, json=data, timeout=15)
+        r = requests.post(url, headers=headers, json=data, timeout=60)
+
+        # retry once if rate limit
+        if r.status_code == 429:
+            time.sleep(2)
+            r = requests.post(url, headers=headers, json=data, timeout=60)
 
         if r.status_code != 200:
             print("Groq API failed:", r.text)
@@ -67,22 +75,22 @@ Structure:
         if "choices" not in response:
             return fallback_summary(book_name, topic)
 
-        return response["choices"][0]["message"]["content"]
+        content = response["choices"][0]["message"].get("content", "")
+
+        return content.strip() if content else fallback_summary(book_name, topic)
 
     except Exception as e:
         print("LLM ERROR:", e)
         return fallback_summary(book_name, topic)
 
 
+# ---------- FALLBACK (WHEN SERVER WAKING) ----------
 def fallback_summary(book_name, topic):
     return f"""
-This book '{book_name}' belongs to {topic} subject.
+I detected the book: {book_name}
 
-It explains the core ideas in a simple and step by step way.
-Students can understand fundamentals clearly.
+AI is starting... please ask again in few seconds.
 
-This book is good for beginners and exam preparation.
-You will learn important concepts and practical understanding.
-
-Reading this helps improve knowledge and confidence in the subject.
+Basic idea:
+This book belongs to {topic} subject and explains concepts step by step for students.
 """
