@@ -7,24 +7,34 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 def generate_book_reply(book_name, topic, user_question):
 
     if not user_question:
-        user_question = "Explain this book simply"
+        user_question = "Explain this book"
 
+    # 🧠 SMART PROMPT
     prompt = f"""
-A student uploaded a book photo.
+You are a friendly teacher helping a student understand a book.
 
-Book name: {book_name}
+Book Name: {book_name}
 Subject: {topic}
 
-Student question: {user_question}
+Student Question:
+{user_question}
 
-Give 5 to 8 simple educational lines:
-1) What the book is about
-2) Who should read it
-3) What they will learn
-Answer like a teacher explaining to a student.
+Instructions:
+- Always answer the student's question
+- But mainly explain the book
+- Give around 8 to 12 simple lines
+- Use very easy English
+- If question unrelated, gently connect it back to the book
+- Teach like a school teacher
+
+Structure:
+1) Small direct answer to the question
+2) What this book teaches
+3) Who should read it
+4) What student will learn
+5) Why it is useful in real life
 """
 
-    # if API key missing → never crash
     if not GROQ_API_KEY:
         return fallback_summary(book_name, topic)
 
@@ -36,16 +46,18 @@ Answer like a teacher explaining to a student.
     }
 
     data = {
-        "model": "llama3-8b-8192",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.5,
-        "max_tokens": 300
+        "model": "llama-3.1-8b-instant",   # ✅ NEW MODEL
+        "messages": [
+            {"role": "system", "content": "You are a helpful educational book assistant."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.4,
+        "max_tokens": 450
     }
 
     try:
-        r = requests.post(url, headers=headers, json=data, timeout=40)
+        r = requests.post(url, headers=headers, json=data, timeout=15)
 
-        # API failed
         if r.status_code != 200:
             print("Groq API failed:", r.text)
             return fallback_summary(book_name, topic)
@@ -62,14 +74,15 @@ Answer like a teacher explaining to a student.
         return fallback_summary(book_name, topic)
 
 
-# ALWAYS WORKING (no internet / no credits / server sleep)
 def fallback_summary(book_name, topic):
     return f"""
-This book '{book_name}' is related to {topic}.
+This book '{book_name}' belongs to {topic} subject.
 
-It introduces important concepts in a clear and structured manner.
-Students can build strong understanding step by step.
+It explains the core ideas in a simple and step by step way.
+Students can understand fundamentals clearly.
 
-Suitable for beginners, learners and exam preparation.
-Reading this book improves knowledge and fundamentals.
+This book is good for beginners and exam preparation.
+You will learn important concepts and practical understanding.
+
+Reading this helps improve knowledge and confidence in the subject.
 """
