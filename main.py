@@ -7,6 +7,7 @@ from PIL import Image
 
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 import startup
 from image_search import search_book, add_book
@@ -15,20 +16,51 @@ from vision_ai.router import router as vision_router
 
 app = FastAPI()
 app.include_router(vision_router)
+
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 4 * 1024 * 1024
 index_lock = Lock()
 
-
-# ---------------- STARTUP ----------------
+# =========================================================
+# 🚀 STARTUP LOAD AI MODELS
+# =========================================================
 @app.on_event("startup")
 def boot():
     startup.start_ai()
 
 
-# ---------------- IMAGE VALIDATION ----------------
+# =========================================================
+# 🧠 AI CHAT (THIS FIXES YOUR 404 ERROR)
+# =========================================================
+class ChatRequest(BaseModel):
+    message: str
+    image_path: str | None = None
+
+
+@app.post("/ai/chat")
+async def ai_chat(req: ChatRequest):
+    user_message = req.message.lower()
+
+    # simple brain (later connect LLM)
+    if "hello" in user_message:
+        answer = "Hello 👋 I am your book assistant!"
+    elif "author" in user_message:
+        answer = "Scan the book cover — I will detect the author."
+    elif "summary" in user_message:
+        answer = "After scanning, I can generate a summary."
+    elif "what is this" in user_message:
+        answer = "Upload a book image and I will identify it."
+    else:
+        answer = f"You asked: {req.message}"
+
+    return {"answer": answer}
+
+
+# =========================================================
+# 🖼 IMAGE VALIDATION
+# =========================================================
 def validate_image(path: str):
     try:
         with Image.open(path) as img:
@@ -38,7 +70,9 @@ def validate_image(path: str):
         return False
 
 
-# ---------------- SAVE TEMP FILE ----------------
+# =========================================================
+# 💾 SAVE TEMP FILE
+# =========================================================
 def save_temp(file: UploadFile):
     file.file.seek(0, 2)
     size = file.file.tell()
@@ -57,7 +91,7 @@ def save_temp(file: UploadFile):
 
 
 # =========================================================
-# 🔍 SCAN BOOK  (SEARCH ONLY — NEVER SAVES)
+# 🔍 SCAN BOOK (ONLY SEARCH)
 # =========================================================
 @app.post("/scan")
 async def scan(uid: str = Query(...), file: UploadFile = File(...)):
@@ -99,7 +133,7 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
 
 
 # =========================================================
-# 📷 ADD BOOK  (FORCE SAVE / LEARN)
+# ➕ ADD BOOK (SAVE / TRAIN AI)
 # =========================================================
 @app.post("/add")
 async def add(uid: str = Query(...), file: UploadFile = File(...)):
@@ -116,10 +150,9 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
-        # check already exists in AI DB
         book, score = await asyncio.to_thread(search_book, path)
 
-        # ---------- ALREADY KNOWN BOOK ----------
+        # already known book
         if book is not None:
             title = book["title"]
 
@@ -129,7 +162,7 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
             save_book_for_user(uid, title)
             return {"status": "saved_existing", "title": title}
 
-        # ---------- NEW BOOK ----------
+        # new book
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
         with index_lock:
