@@ -7,6 +7,7 @@ from PIL import Image
 
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 import startup
 from image_search import search_book, add_book
@@ -19,28 +20,31 @@ load_dotenv()
 app = FastAPI()
 app.include_router(assistant_router)
 
+# ---------------- CORS (VERY IMPORTANT FOR FLUTTER) ----------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 4 * 1024 * 1024
 index_lock = Lock()
-
-# 🔐 FAISS safety (multiple users scan pannumboth crash aagadhu)
 faiss_lock = Lock()
 
-
-# ---------------- STARTUP ----------------
+# ---------------- STARTUP (NON BLOCKING) ----------------
 @app.on_event("startup")
 async def boot():
-    # model load block panna koodadhu
-    await asyncio.to_thread(startup.start_ai)
+    asyncio.create_task(asyncio.to_thread(startup.start_ai))
 
-
-# health check (Render ku important)
+# health check
 @app.get("/")
 def root():
     return {"status": "alive"}
-
 
 # ---------------- IMAGE VALIDATION ----------------
 def validate_image(path: str):
@@ -52,11 +56,9 @@ def validate_image(path: str):
     except Exception:
         return False
 
-
 # ---------------- SAVE TEMP FILE ----------------
 def save_temp(file: UploadFile):
 
-    # only images allow
     if not file.content_type.startswith("image/"):
         raise ValueError("invalid_type")
 
@@ -71,13 +73,14 @@ def save_temp(file: UploadFile):
 
     with open(path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+        buffer.flush()
+        os.fsync(buffer.fileno())
 
     file.file.close()
     return path
 
-
 # =========================================================
-# 🔍 SCAN BOOK  (SEARCH ONLY — NEVER SAVES)
+# 🔍 SCAN BOOK
 # =========================================================
 @app.post("/scan")
 async def scan(uid: str = Query(...), file: UploadFile = File(...)):
@@ -89,21 +92,25 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"status": str(e)})
 
     if not validate_image(path):
-        if os.path.exists(path):
-            os.remove(path)
+        os.remove(path)
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
-        # thread safe FAISS search
         with faiss_lock:
-            book, score = await asyncio.to_thread(search_book, path)
+            try:
+                book, score = await asyncio.wait_for(
+                    asyncio.to_thread(search_book, path),
+                    timeout=12
+                )
+            except asyncio.TimeoutError:
+                return {"status": "ai_timeout"}
 
         if book is None:
             return {"status": "not_found"}
 
         title = book["title"]
-
         owned = await asyncio.to_thread(user_has_book, uid, title)
+
         if owned:
             return {"status": "owned", "title": title}
 
@@ -120,9 +127,8 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
         if path and os.path.exists(path):
             os.remove(path)
 
-
 # =========================================================
-# 📷 ADD BOOK  (FORCE SAVE / LEARN)
+# 📷 ADD BOOK (LEARN)
 # =========================================================
 @app.post("/add")
 async def add(uid: str = Query(...), file: UploadFile = File(...)):
@@ -134,26 +140,31 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"status": str(e)})
 
     if not validate_image(path):
-        if os.path.exists(path):
-            os.remove(path)
+        os.remove(path)
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
         with faiss_lock:
-            book, score = await asyncio.to_thread(search_book, path)
+            try:
+                book, score = await asyncio.wait_for(
+                    asyncio.to_thread(search_book, path),
+                    timeout=12
+                )
+            except asyncio.TimeoutError:
+                return {"status": "ai_timeout"}
 
-        # ---------- ALREADY KNOWN BOOK ----------
+        # Existing book
         if book is not None:
             title = book["title"]
-
             owned = await asyncio.to_thread(user_has_book, uid, title)
+
             if owned:
                 return {"status": "already_saved", "title": title}
 
             await asyncio.to_thread(save_book_for_user, uid, title)
             return {"status": "saved_existing", "title": title}
 
-        # ---------- NEW BOOK ----------
+        # New book
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
         with index_lock:
