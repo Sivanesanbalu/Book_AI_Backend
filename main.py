@@ -12,6 +12,8 @@ import startup
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
 from assistant_api import router as assistant_router
+from dotenv import load_dotenv
+load_dotenv()
 app = FastAPI()
 app.include_router(assistant_router)
 UPLOAD_DIR = "uploads"

@@ -16,3 +16,5 @@ faiss-cpu==1.8.0
 firebase-admin==6.5.0
 packaging==24.1
 requests
+
+python-dotenv
