@@ -48,7 +48,7 @@ Structure:
     }
 
     data = {
-        "model": "llama3-70b-8192",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": "You are a helpful educational book assistant."},
             {"role": "user", "content": prompt}
