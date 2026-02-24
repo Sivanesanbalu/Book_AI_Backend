@@ -13,34 +13,53 @@ from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
 from assistant_api import router as assistant_router
 from dotenv import load_dotenv
+
 load_dotenv()
+
 app = FastAPI()
 app.include_router(assistant_router)
+
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 4 * 1024 * 1024
 index_lock = Lock()
 
+# 🔐 FAISS safety (multiple users scan pannumboth crash aagadhu)
+faiss_lock = Lock()
+
 
 # ---------------- STARTUP ----------------
 @app.on_event("startup")
-def boot():
-    startup.start_ai()
+async def boot():
+    # model load block panna koodadhu
+    await asyncio.to_thread(startup.start_ai)
+
+
+# health check (Render ku important)
+@app.get("/")
+def root():
+    return {"status": "alive"}
 
 
 # ---------------- IMAGE VALIDATION ----------------
 def validate_image(path: str):
     try:
-        with Image.open(path) as img:
-            img.load()
+        img = Image.open(path)
+        img.verify()
+        img.close()
         return True
-    except:
+    except Exception:
         return False
 
 
 # ---------------- SAVE TEMP FILE ----------------
 def save_temp(file: UploadFile):
+
+    # only images allow
+    if not file.content_type.startswith("image/"):
+        raise ValueError("invalid_type")
+
     file.file.seek(0, 2)
     size = file.file.tell()
     file.file.seek(0)
@@ -66,8 +85,8 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
 
     try:
         path = save_temp(file)
-    except ValueError:
-        return JSONResponse(status_code=413, content={"status": "file_too_large"})
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"status": str(e)})
 
     if not validate_image(path):
         if os.path.exists(path):
@@ -75,14 +94,17 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
-        book, score = await asyncio.to_thread(search_book, path)
+        # thread safe FAISS search
+        with faiss_lock:
+            book, score = await asyncio.to_thread(search_book, path)
 
         if book is None:
             return {"status": "not_found"}
 
         title = book["title"]
 
-        if user_has_book(uid, title):
+        owned = await asyncio.to_thread(user_has_book, uid, title)
+        if owned:
             return {"status": "owned", "title": title}
 
         return {
@@ -108,8 +130,8 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
 
     try:
         path = save_temp(file)
-    except ValueError:
-        return JSONResponse(status_code=413, content={"status": "file_too_large"})
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"status": str(e)})
 
     if not validate_image(path):
         if os.path.exists(path):
@@ -117,17 +139,18 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
-        # check already exists in AI DB
-        book, score = await asyncio.to_thread(search_book, path)
+        with faiss_lock:
+            book, score = await asyncio.to_thread(search_book, path)
 
         # ---------- ALREADY KNOWN BOOK ----------
         if book is not None:
             title = book["title"]
 
-            if user_has_book(uid, title):
+            owned = await asyncio.to_thread(user_has_book, uid, title)
+            if owned:
                 return {"status": "already_saved", "title": title}
 
-            save_book_for_user(uid, title)
+            await asyncio.to_thread(save_book_for_user, uid, title)
             return {"status": "saved_existing", "title": title}
 
         # ---------- NEW BOOK ----------
@@ -136,7 +159,7 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
         with index_lock:
             await asyncio.to_thread(add_book, path, unique_title)
 
-        save_book_for_user(uid, unique_title)
+        await asyncio.to_thread(save_book_for_user, uid, unique_title)
 
         return {"status": "saved_new", "title": unique_title}
 
