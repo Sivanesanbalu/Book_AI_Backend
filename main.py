@@ -11,9 +11,10 @@ from fastapi.responses import JSONResponse
 import startup
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
+from vision_ai.router import router as vision_router
 
 app = FastAPI()
-
+app.include_router(vision_router)
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
