@@ -5,38 +5,39 @@ import time
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
-def generate_book_reply(book_name, topic, user_question):
+def generate_book_reply(book_name, topic, user_question, book_content):
 
     if not user_question:
         user_question = "Explain this book"
 
-    # ---------- PROMPT ----------
+    # ---------- PROMPT (REAL RAG PROMPT) ----------
     prompt = f"""
-You are a friendly teacher helping a student understand a book.
+    You are a strict school teacher.
 
-Book Name: {book_name}
-Subject: {topic}
+    You MUST answer ONLY using the BOOK CONTENT below.
+    If answer not present, say: "This part is not in the book content."
 
-Student Question:
-{user_question}
+    BOOK NAME:
+    {book_name}
 
-Instructions:
-- Always answer the student's question
-- But mainly explain the book
-- Give around 8 to 12 simple lines
-- Use very easy English
-- If question unrelated, gently connect it back to the book
-- Teach like a school teacher
+    SUBJECT:
+    {topic}
 
-Structure:
-1) Small direct answer
-2) What this book teaches
-3) Who should read it
-4) What student will learn
-5) Real life usage
-"""
+    BOOK CONTENT:
+    {book_content}
 
-    # ---------- IF NO API KEY ----------
+    STUDENT QUESTION:
+    {user_question}
+
+    Rules:
+    - Do NOT use outside knowledge
+    - Do NOT guess
+    - Do NOT add extra syllabus
+    - Explain in very simple student language
+    - 6 to 10 short lines
+    """
+
+    # ---------- NO API KEY ----------
     if not GROQ_API_KEY:
         return fallback_summary(book_name, topic)
 
@@ -48,20 +49,21 @@ Structure:
     }
 
     data = {
-        "model": "llama-3.3-70b-versatile",
+        # FAST + FREE + GOOD FOR RAG
+        "model": "llama-3.1-8b-instant",
         "messages": [
-            {"role": "system", "content": "You are a helpful educational book assistant."},
+            {"role": "system", "content": "You explain books using provided knowledge only."},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.4,
-        "max_tokens": 450
+        "temperature": 0.2,   # VERY IMPORTANT (stop hallucination)
+        "max_tokens": 400
     }
 
-    # ---------- REQUEST WITH RETRY ----------
+    # ---------- REQUEST ----------
     try:
         r = requests.post(url, headers=headers, json=data, timeout=60)
 
-        # retry once if rate limit
+        # retry once
         if r.status_code == 429:
             time.sleep(2)
             r = requests.post(url, headers=headers, json=data, timeout=60)
@@ -77,20 +79,23 @@ Structure:
 
         content = response["choices"][0]["message"].get("content", "")
 
-        return content.strip() if content else fallback_summary(book_name, topic)
+        if not content or len(content) < 20:
+            return fallback_summary(book_name, topic)
+
+        return content.strip()
 
     except Exception as e:
         print("LLM ERROR:", e)
         return fallback_summary(book_name, topic)
 
 
-# ---------- FALLBACK (WHEN SERVER WAKING) ----------
+# ---------- FALLBACK ----------
 def fallback_summary(book_name, topic):
     return f"""
 I detected the book: {book_name}
 
-AI is starting... please ask again in few seconds.
+The AI server is starting or book data not available.
 
-Basic idea:
-This book belongs to {topic} subject and explains concepts step by step for students.
+This book belongs to {topic}.
+Please scan again in a moment for full explanation.
 """
