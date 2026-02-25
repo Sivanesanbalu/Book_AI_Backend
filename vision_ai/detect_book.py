@@ -130,20 +130,37 @@ Title — Author
 """
 
     body = {
-        "model": "llava-v1.5-7b-4096-preview",
-        "messages": [{
+    "model": "meta-llama/llama-3.2-11b-vision-instruct",
+    "messages": [
+        {
             "role": "user",
             "content": [
-                {"type": "text", "text": prompt},
+                {
+                    "type": "text",
+                    "text": """
+You are reading a real book cover photo.
+
+Return ONLY the book title and author.
+
+Rules:
+- Focus on big title text
+- Ignore stickers, price tags
+- Guess intelligently if partial visible
+- Output format: Title — Author
+"""
+                },
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{img}"}
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{img}"
+                    }
                 }
             ]
-        }],
-        "temperature": 0,
-        "max_tokens": 80
-    }
+        }
+    ],
+    "temperature": 0.0,
+    "max_tokens": 80
+}
 
     try:
         r = requests.post(
