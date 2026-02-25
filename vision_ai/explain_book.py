@@ -24,7 +24,7 @@ Description: {desc}
     "https://api.groq.com/openai/v1/chat/completions",
     headers={"Authorization":f"Bearer {GROQ_API_KEY}"},
     json={
-        "model":"llama-3.1-8b-instant",
+        "model":"llama-3.2-11b-vision-preview",
         "messages":[{"role":"user","content":prompt}],
         "temperature":0.4
     })
