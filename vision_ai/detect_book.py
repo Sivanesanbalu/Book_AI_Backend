@@ -130,7 +130,7 @@ Title — Author
 """
 
     body = {
-    "model": "meta-llama/llama-3.2-11b-vision-instruct",
+    "model": "llama-3.2-11b-vision-preview",
     "messages": [
         {
             "role": "user",
