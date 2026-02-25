@@ -4,7 +4,6 @@ import os, uuid, shutil
 from .detect_book import detect_book_title
 from .fetch_book import fetch_book_details
 from .explain_book import explain_book
-
 router = APIRouter(prefix="/ai", tags=["AI Vision"])
 
 UPLOAD_DIR = "uploads_ai"
