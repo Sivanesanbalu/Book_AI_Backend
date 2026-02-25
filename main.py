@@ -127,20 +127,42 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
 async def ask_book_ai(file: UploadFile = File(...)):
     path = f"{UPLOAD_DIR}/{uuid.uuid4().hex}.jpg"
 
-    with open(path, "wb") as f:
-        f.write(await file.read())
+    try:
+        with open(path, "wb") as f:
+            f.write(await file.read())
 
-    book_name = detect_book(path)
-    book = get_book_info(book_name)
+        # Step 1: Detect
+        book_name = detect_book(path)
 
-    if not book:
-        return JSONResponse({"error": "Book not found"}, status_code=404)
+        if not book_name:
+            return JSONResponse(
+                status_code=422,
+                content={"error": "Could not identify book from image"}
+            )
 
-    overview = summarize_book(book)
+        # Step 2: Fetch
+        book = get_book_info(book_name)
 
-    os.remove(path)
+        if not book:
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No info found for '{book_name}'"}
+            )
 
-    return {
-        "title": book["title"],
-        "overview": overview
-    }
+        # Step 3: Summarize
+        overview = summarize_book(book)
+
+        return {
+            "title": book["title"],
+            "overview": overview
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
