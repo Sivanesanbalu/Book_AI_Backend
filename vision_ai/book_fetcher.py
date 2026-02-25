@@ -1,5 +1,5 @@
 import requests
-
+from .prompts import SYSTEM_PROMPT
 def get_book_info(book_name):
 
     url = f"https://www.googleapis.com/books/v1/volumes?q={book_name}"

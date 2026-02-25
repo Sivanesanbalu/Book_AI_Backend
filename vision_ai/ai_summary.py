@@ -1,8 +1,7 @@
 import requests
 import os
 from dotenv import load_dotenv
-from prompts import SYSTEM_PROMPT
-
+from .prompts import SYSTEM_PROMPT
 load_dotenv()
 API_KEY = os.getenv("GROQ_API_KEY")
 

@@ -123,7 +123,7 @@ def add_book(image_path, title):
             "embedding": emb.flatten().tolist()
         })
 
-        save_db()
+        load_db()
 
         # sync index
         rebuild_index()

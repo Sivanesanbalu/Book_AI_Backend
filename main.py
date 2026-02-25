@@ -7,11 +7,16 @@ from PIL import Image
 
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 import startup
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
+
+# -------- FLOW 2 IMPORTS --------
+from vision_ai.vision import detect_book
+from vision_ai.book_fetcher import get_book_info
+from vision_ai.ai_summary import summarize_book
+
 
 app = FastAPI()
 
@@ -20,46 +25,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 4 * 1024 * 1024
 index_lock = Lock()
-
-
-
-@app.get("/")
-def home():
-    return {"status": "AI Book Assistant running"}
-
-# =========================================================
-# 🚀 STARTUP LOAD AI MODELS
-# =========================================================
-@app.on_event("startup")
-def boot():
-    startup.start_ai()
-
-
-# =========================================================
-# 🧠 AI CHAT (THIS FIXES YOUR 404 ERROR)
-# =========================================================
-class ChatRequest(BaseModel):
-    message: str
-    image_path: str | None = None
-
-
-@app.post("/ai/chat")
-async def ai_chat(req: ChatRequest):
-    user_message = req.message.lower()
-
-    # simple brain (later connect LLM)
-    if "hello" in user_message:
-        answer = "Hello 👋 I am your book assistant!"
-    elif "author" in user_message:
-        answer = "Scan the book cover — I will detect the author."
-    elif "summary" in user_message:
-        answer = "After scanning, I can generate a summary."
-    elif "what is this" in user_message:
-        answer = "Upload a book image and I will identify it."
-    else:
-        answer = f"You asked: {req.message}"
-
-    return {"answer": answer}
 
 
 # =========================================================
@@ -95,20 +60,14 @@ def save_temp(file: UploadFile):
 
 
 # =========================================================
-# 🔍 SCAN BOOK (ONLY SEARCH)
+# 🔍 FLOW-1 → SCAN BOOK
 # =========================================================
 @app.post("/scan")
 async def scan(uid: str = Query(...), file: UploadFile = File(...)):
-    path = None
-
-    try:
-        path = save_temp(file)
-    except ValueError:
-        return JSONResponse(status_code=413, content={"status": "file_too_large"})
+    path = save_temp(file)
 
     if not validate_image(path):
-        if os.path.exists(path):
-            os.remove(path)
+        os.remove(path)
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
@@ -122,63 +81,66 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
         if user_has_book(uid, title):
             return {"status": "owned", "title": title}
 
-        return {
-            "status": "found",
-            "title": title,
-            "confidence": round(float(score), 3)
-        }
-
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return {"status": "found", "title": title, "confidence": round(float(score), 3)}
 
     finally:
-        if path and os.path.exists(path):
+        if os.path.exists(path):
             os.remove(path)
 
 
 # =========================================================
-# ➕ ADD BOOK (SAVE / TRAIN AI)
+# ➕ FLOW-1 → ADD BOOK
 # =========================================================
 @app.post("/add")
 async def add(uid: str = Query(...), file: UploadFile = File(...)):
-    path = None
-
-    try:
-        path = save_temp(file)
-    except ValueError:
-        return JSONResponse(status_code=413, content={"status": "file_too_large"})
+    path = save_temp(file)
 
     if not validate_image(path):
-        if os.path.exists(path):
-            os.remove(path)
+        os.remove(path)
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
         book, score = await asyncio.to_thread(search_book, path)
 
-        # already known book
         if book is not None:
             title = book["title"]
-
-            if user_has_book(uid, title):
-                return {"status": "already_saved", "title": title}
-
             save_book_for_user(uid, title)
             return {"status": "saved_existing", "title": title}
 
-        # new book
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
         with index_lock:
             await asyncio.to_thread(add_book, path, unique_title)
 
         save_book_for_user(uid, unique_title)
-
         return {"status": "saved_new", "title": unique_title}
 
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
     finally:
-        if path and os.path.exists(path):
+        if os.path.exists(path):
             os.remove(path)
+
+
+# =========================================================
+# 🤖 FLOW-2 → ASK BOOK AI (VISION → SUMMARY)
+# =========================================================
+@app.post("/ask-book-ai")
+async def ask_book_ai(file: UploadFile = File(...)):
+    path = f"{UPLOAD_DIR}/{uuid.uuid4().hex}.jpg"
+
+    with open(path, "wb") as f:
+        f.write(await file.read())
+
+    book_name = detect_book(path)
+    book = get_book_info(book_name)
+
+    if not book:
+        return JSONResponse({"error": "Book not found"}, status_code=404)
+
+    overview = summarize_book(book)
+
+    os.remove(path)
+
+    return {
+        "title": book["title"],
+        "overview": overview
+    }
