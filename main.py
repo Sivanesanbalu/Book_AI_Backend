@@ -28,6 +28,14 @@ index_lock = Lock()
 
 
 # =========================================================
+# 🌍 HEALTH CHECK (IMPORTANT FOR RENDER)
+# =========================================================
+@app.get("/")
+def root():
+    return {"status": "running"}
+
+
+# =========================================================
 # 🖼 IMAGE VALIDATION
 # =========================================================
 def validate_image(path: str):
@@ -81,7 +89,11 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
         if user_has_book(uid, title):
             return {"status": "owned", "title": title}
 
-        return {"status": "found", "title": title, "confidence": round(float(score), 3)}
+        return {
+            "status": "found",
+            "title": title,
+            "confidence": round(float(score), 3)
+        }
 
     finally:
         if os.path.exists(path):
@@ -113,6 +125,7 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
             await asyncio.to_thread(add_book, path, unique_title)
 
         save_book_for_user(uid, unique_title)
+
         return {"status": "saved_new", "title": unique_title}
 
     finally:
@@ -128,19 +141,27 @@ async def ask_book_ai(file: UploadFile = File(...)):
     path = f"{UPLOAD_DIR}/{uuid.uuid4().hex}.jpg"
 
     try:
-        with open(path, "wb") as f:
-            f.write(await file.read())
+        contents = await file.read()
 
-        # Step 1: Detect
-        book_name = detect_book(path)
+        if not contents:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Empty image uploaded"}
+            )
+
+        with open(path, "wb") as f:
+            f.write(contents)
+
+        # Step 1: Vision (non-blocking)
+        book_name = await asyncio.to_thread(detect_book, path)
 
         if not book_name:
             return JSONResponse(
                 status_code=422,
-                content={"error": "Could not identify book from image"}
+                content={"error": "Could not identify book"}
             )
 
-        # Step 2: Fetch
+        # Step 2: Fetch info
         book = get_book_info(book_name)
 
         if not book:
@@ -149,8 +170,8 @@ async def ask_book_ai(file: UploadFile = File(...)):
                 content={"error": f"No info found for '{book_name}'"}
             )
 
-        # Step 3: Summarize
-        overview = summarize_book(book)
+        # Step 3: Summarize (non-blocking)
+        overview = await asyncio.to_thread(summarize_book, book)
 
         return {
             "title": book["title"],

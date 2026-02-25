@@ -1,14 +1,46 @@
 import requests
 import base64
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
 API_KEY = os.getenv("GROQ_API_KEY")
 
 
+def clean_title(text: str):
+    """
+    Cleans AI output so Google Books API can match correctly
+    """
+
+    if not text:
+        return None
+
+    # normalize separators
+    text = text.replace(" by ", " - ")
+    text = text.replace("—", "-")
+    text = text.replace("|", "-")
+
+    # keep first line only
+    text = text.split("\n")[0]
+
+    # remove sentences AI may add
+    text = re.sub(r"The book.*?:", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"This is.*?:", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"Here is.*?:", "", text, flags=re.IGNORECASE)
+
+    # remove quotes
+    text = text.replace('"', '').replace("'", "")
+
+    # collapse spaces
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
+
+
 def detect_book(image_path):
     try:
+        # convert image → base64
         with open(image_path, "rb") as img:
             b64 = base64.b64encode(img.read()).decode()
 
@@ -39,23 +71,28 @@ def detect_book(image_path):
             "max_tokens": 100
         }
 
+        # request
         res = requests.post(url, headers=headers, json=payload, timeout=60)
 
-        print("GROQ RESPONSE:", res.text)
+        print("GROQ RAW:", res.text)
 
         data = res.json()
 
-        # ❗ IMPORTANT FIX
+        # 🛑 if model error / quota / blocked
         if "choices" not in data:
             print("VISION ERROR:", data)
             return None
 
-        text = data["choices"][0]["message"]["content"].strip()
+        raw_text = data["choices"][0]["message"]["content"].strip()
 
-        if not text:
+        if not raw_text:
             return None
 
-        return text
+        cleaned = clean_title(raw_text)
+
+        print("VISION CLEAN:", cleaned)
+
+        return cleaned
 
     except Exception as e:
         print("VISION EXCEPTION:", e)
