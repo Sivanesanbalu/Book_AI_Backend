@@ -4,19 +4,19 @@ python-multipart==0.0.9
 
 numpy==1.26.4
 pillow==10.4.0
+opencv-python-headless==4.10.0.84
 
-# PyTorch CPU (Render safe)
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2+cpu
-torchvision==0.17.2+cpu
-timm==0.9.16
-
-faiss-cpu==1.8.0
+requests>=2.31.0
+python-dotenv==1.0.1
 
 firebase-admin==6.5.0
 packaging==24.1
 
+# Optional but safe
+faiss-cpu==1.8.0
 
-python-dotenv
-
-requests>=2.31.0
+# PyTorch CPU (Render compatible)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2+cpu
+torchvision==0.17.2+cpu
+timm==0.9.16
