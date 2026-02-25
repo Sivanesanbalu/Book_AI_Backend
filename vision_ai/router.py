@@ -1,45 +1,30 @@
-from fastapi import APIRouter, UploadFile, File, Form
-import os, uuid, shutil
-
+from fastapi import APIRouter,UploadFile,File,Form
+import os,uuid,shutil
 from .detect_book import detect_book_title
 from .fetch_book import fetch_book_details
 from .explain_book import explain_book
-router = APIRouter(prefix="/ai", tags=["AI Vision"])
 
-UPLOAD_DIR = "uploads_ai"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
+router=APIRouter(prefix="/ai")
 
 @router.post("/understand-book")
-async def understand_book(
-    question: str = Form(""),
-    file: UploadFile = File(...)
-):
+async def understand_book(file:UploadFile=File(...),question:str=Form("")):
 
-    temp = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}.jpg")
+    temp=f"tmp/{uuid.uuid4().hex}.jpg"
+    os.makedirs("tmp",exist_ok=True)
 
-    try:
-        with open(temp, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    with open(temp,"wb") as b:
+        shutil.copyfileobj(file.file,b)
 
-        # STEP 1 — detect title
-        title = detect_book_title(temp)
-        if not title:
-            return {"answer": "I cannot read the book cover clearly"}
+    title=detect_book_title(temp)
 
-        # STEP 2 — search internet
-        book_data = fetch_book_details(title)
-        if not book_data:
-            return {"book": title, "answer": "Book detected but info unavailable"}
+    if not title:
+        return {"answer":"Could not identify book"}
 
-        # STEP 3 — explain
-        if question.strip() == "":
-            question = "Explain what this book teaches and why it is useful"
+    data=fetch_book_details(title)
 
-        explanation = explain_book(title, book_data, question)
+    if not data:
+        return {"book":title,"answer":"Book found but info unavailable"}
 
-        return {"book": title, "answer": explanation}
+    ans=explain_book(title,data,question)
 
-    finally:
-        if os.path.exists(temp):
-            os.remove(temp)
+    return {"book":title,"answer":ans}

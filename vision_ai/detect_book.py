@@ -1,57 +1,125 @@
-import requests, base64, os, re
+import os, base64, requests, re
+from PIL import Image, ExifTags, ImageEnhance, ImageFilter
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
-def encode_image(path):
-    with open(path, "rb") as img:
-        return base64.b64encode(img.read()).decode()
+# =========================================================
+# FIX ORIENTATION
+# =========================================================
+def fix_rotation(img):
+    try:
+        for orientation in ExifTags.TAGS.keys():
+            if ExifTags.TAGS[orientation] == 'Orientation':
+                break
+        exif = img._getexif()
+        if exif:
+            val = exif.get(orientation)
+            if val == 3:
+                img = img.rotate(180, expand=True)
+            elif val == 6:
+                img = img.rotate(270, expand=True)
+            elif val == 8:
+                img = img.rotate(90, expand=True)
+    except:
+        pass
+    return img
 
 
-def extract_title(text):
-    if not text:
+# =========================================================
+# PREPROCESS FOR VISION MODEL (VERY IMPORTANT)
+# =========================================================
+def prepare_for_ai(path):
+
+    img = Image.open(path)
+
+    # 1) rotate correctly
+    img = fix_rotation(img)
+
+    # 2) convert to RGB (mobile images often RGBA/HEIC)
+    img = img.convert("RGB")
+
+    # 3) center crop (removes background noise)
+    w, h = img.size
+    crop = min(w, h)
+    img = img.crop(((w-crop)//2, (h-crop)//2, (w+crop)//2, (h+crop)//2))
+
+    # 4) resize to vision friendly resolution
+    img = img.resize((768, 768), Image.LANCZOS)
+
+    # 5) improve readability
+    img = ImageEnhance.Contrast(img).enhance(1.4)
+    img = ImageEnhance.Sharpness(img).enhance(1.8)
+    img = img.filter(ImageFilter.DETAIL)
+
+    # 6) save optimized jpeg
+    img.save(path, "JPEG", quality=92, subsampling=0)
+
+
+# =========================================================
+# CLEAN TITLE
+# =========================================================
+def clean_title(text):
+    text = text.replace("\n", " ").strip()
+    text = re.split(r"—|-|by", text)[0]
+    text = re.sub(r"[^\w\s]", "", text)
+    return " ".join(text.split())
+
+
+# =========================================================
+# MAIN DETECTION
+# =========================================================
+def detect_book_title(path):
+
+    if not GROQ_API_KEY:
+        print("NO API KEY")
         return None
 
-    text = text.split("\n")[0]
+    # ⭐ THE MAGIC STEP
+    prepare_for_ai(path)
 
-    if " - " in text:
-        text = text.split(" - ")[0]
+    # encode image
+    with open(path, "rb") as f:
+        img = base64.b64encode(f.read()).decode()
 
-    text = re.sub(r"(?i)by .*", "", text)
-    text = re.sub(r"[^\w\s]", "", text)
+    url = "https://api.groq.com/openai/v1/chat/completions"
 
-    return text.strip()
-
-
-def detect_book_title(image_path):
-
-    img_base64 = encode_image(image_path)
-
-    prompt = """
-Read the book cover and return only the book title.
-Ignore subtitles and stickers.
-Format: Title - Author
-"""
+    body = {
+        "model": "llava-v1.5-7b-4096-preview",
+        "messages": [{
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text":
+                    "Read this book cover carefully. Return only: Title — Author"
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img}"}
+                }
+            ]
+        }],
+        "temperature": 0
+    }
 
     r = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
+        url,
         headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-        json={
-            "model": "llama-3.2-11b-vision-preview",
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url",
-                     "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}}
-                ]
-            }],
-            "temperature": 0
-        },
-        timeout=60
+        json=body,
+        timeout=120
     )
 
     if r.status_code != 200:
+        print("VISION ERROR:", r.text)
         return None
 
     raw = r.json()["choices"][0]["message"]["content"]
-    return extract_title(raw)
+    print("VISION RAW:", raw)
+
+    title = clean_title(raw)
+
+    if len(title) < 3:
+        return None
+
+    return title

@@ -12,11 +12,15 @@ from pydantic import BaseModel
 import startup
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
-from vision_ai.router import router as vision_router
-from vision_ai.chat import router as chat_router
-app = FastAPI()
-app.include_router(vision_router)
-app.include_router(chat_router)
+from fastapi import FastAPI
+from vision_ai.router import router
+
+app=FastAPI()
+app.include_router(router)
+
+@app.get("/")
+def home():
+    return {"status":"running"}
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
