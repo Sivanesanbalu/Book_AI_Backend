@@ -25,31 +25,39 @@ def detect_book_title(image_path):
     }
 
     prompt = """
-You are reading a book cover image.
+    You are reading a book cover image.
 
-Your job:
-Identify the MOST LIKELY book title and author.
+    Your job:
+    Identify the MOST LIKELY book title and author.
 
-Rules:
-- Focus on large bold text
-- Ignore small subtitles
-- Ignore logos and stickers
-- If partially visible, intelligently guess the real book
-- Never say unknown unless absolutely impossible
+    Rules:
+    - Focus on large bold text
+    - Ignore small subtitles
+    - Ignore logos and stickers
+    - If partially visible, intelligently guess the real book
+    - Never say unknown unless absolutely impossible
 
-Return format:
-Title - Author
+    Return format:
+    Title - Author
 
-Example:
-Clean Code - Robert C. Martin
-"""
+    Example:
+    Clean Code - Robert C. Martin
+    """
     data = {
         "model": "llama-3.2-11b-vision-preview",
         "messages": [
-            {"role": "user", "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": f"data:image/jpeg;base64,{img_base64}"}
-            ]}
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{img_base64}"
+                        }
+                    }
+                ]
+            }
         ],
         "temperature": 0
     }
