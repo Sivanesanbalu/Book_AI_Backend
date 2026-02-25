@@ -13,15 +13,22 @@ import startup
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
 from vision_ai.router import router as vision_router
-
+from vision_ai.chat import router as chat_router
 app = FastAPI()
 app.include_router(vision_router)
-
+app.include_router(chat_router)
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 4 * 1024 * 1024
 index_lock = Lock()
+
+
+
+@app.get("/")
+def home():
+    return {"status": "AI Book Assistant running"}
+
 
 # =========================================================
 # 🚀 STARTUP LOAD AI MODELS

@@ -1,76 +1,50 @@
-import requests
-import os
+import requests, os
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+def analyze_book(title, book_data, question):
 
-def explain_book(title, book_data, question):
-
-    if not GROQ_API_KEY:
-        return "AI not ready"
-
-    description = book_data.get("description", "").strip()
-
-    # 🚨 No description protection
-    if len(description) < 40:
-        return f"I found the book '{book_data['title']}', but I could not find enough information to explain it."
+    description = book_data.get("description", "")
 
     prompt = f"""
-You are a friendly book tutor helping a student understand a book.
+You are a senior student advising a junior.
 
-STRICT RULES:
-- Use ONLY the provided description
-- Do NOT invent story or content
-- If information missing → clearly say "not mentioned in description"
-- Explain clearly in simple English
-- Be helpful and structured
-- Maximum 10 lines
+Explain the usefulness of the book.
 
-BOOK DETAILS:
-Title: {book_data['title']}
-Author: {book_data['authors']}
-Category: {book_data['categories']}
+Give:
+1) What this book teaches
+2) Who should read it
+3) Is it worth reading
+4) Difficulty level
 
-DESCRIPTION:
-{description}
+Speak naturally like a human, not marketing.
 
-USER QUESTION:
-{question}
+BOOK:
+Title: {title}
+Author: {book_data.get("authors")}
+Category: {book_data.get("categories")}
+Description: {description}
 
-RESPONSE STYLE:
-If summary requested → give short summary
-If learning requested → explain what user will learn
-If difficulty asked → infer from description only
-If general → explain purpose of the book
+User question: {question}
 """
 
     url = "https://api.groq.com/openai/v1/chat/completions"
+
+    body = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.4,
+        "max_tokens": 350
+    }
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    data = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.3,  # little naturalness but still safe
-        "max_tokens": 260
-    }
-
     try:
-        r = requests.post(url, headers=headers, json=data, timeout=60)
-
-        if r.status_code != 200:
-            return "AI explanation failed"
-
-        answer = r.json()["choices"][0]["message"]["content"].strip()
-
-        # cleanup overly tiny responses
-        if len(answer) < 20:
-            return "I could not confidently understand this book from available information."
-
-        return answer
+        r = requests.post(url, headers=headers, json=body, timeout=60)
+        return r.json()["choices"][0]["message"]["content"]
 
     except:
-        return "AI error while explaining"
+        return "Couldn't analyze the book."

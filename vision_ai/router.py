@@ -13,45 +13,33 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/understand-book")
 async def understand_book(
-    question: str = Form("Explain this book"),
+    question: str = Form(""),
     file: UploadFile = File(...)
 ):
 
     temp = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}.jpg")
 
     try:
-        # save image
         with open(temp, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # STEP 1 — identify book
+        # STEP 1 — detect title
         title = detect_book_title(temp)
-
-        # 🔍 DEBUG RETURN (VERY IMPORTANT)
         if not title:
-            return {
-                "debug": "vision_failed",
-                "answer": "I cannot read the book cover clearly"
-            }
+            return {"answer": "I cannot read the book cover clearly"}
 
         # STEP 2 — search internet
         book_data = fetch_book_details(title)
-
         if not book_data:
-            return {
-                "debug": title,
-                "book": title,
-                "answer": "Book detected but details unavailable"
-            }
+            return {"book": title, "answer": "Book detected but info unavailable"}
 
         # STEP 3 — explain
+        if question.strip() == "":
+            question = "Explain what this book teaches and why it is useful"
+
         explanation = explain_book(title, book_data, question)
 
-        return {
-            "debug": title,
-            "book": title,
-            "answer": explanation
-        }
+        return {"book": title, "answer": explanation}
 
     finally:
         if os.path.exists(temp):
