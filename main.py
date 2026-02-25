@@ -12,15 +12,9 @@ from pydantic import BaseModel
 import startup
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
-from fastapi import FastAPI
-from vision_ai.router import router
 
-app=FastAPI()
-app.include_router(router)
+app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"status":"running"}
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -32,7 +26,6 @@ index_lock = Lock()
 @app.get("/")
 def home():
     return {"status": "AI Book Assistant running"}
-
 
 # =========================================================
 # 🚀 STARTUP LOAD AI MODELS
