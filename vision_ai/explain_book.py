@@ -11,22 +11,22 @@ def explain_book(title, book_data, question):
 
     description = book_data.get("description", "").strip()
 
-    # 🚨 CRITICAL: If no description -> don't hallucinate
+    # 🚨 No description protection
     if len(description) < 40:
         return f"I found the book '{book_data['title']}', but I could not find enough information to explain it."
 
     prompt = f"""
-You are a careful teacher.
+You are a friendly book tutor helping a student understand a book.
 
-RULES:
-- Use ONLY the given description
-- DO NOT add your own story
-- DO NOT guess the plot
-- If info missing, say information not available
-- Answer in simple English
-- Maximum 8 lines
+STRICT RULES:
+- Use ONLY the provided description
+- Do NOT invent story or content
+- If information missing → clearly say "not mentioned in description"
+- Explain clearly in simple English
+- Be helpful and structured
+- Maximum 10 lines
 
-BOOK INFO:
+BOOK DETAILS:
 Title: {book_data['title']}
 Author: {book_data['authors']}
 Category: {book_data['categories']}
@@ -34,8 +34,14 @@ Category: {book_data['categories']}
 DESCRIPTION:
 {description}
 
-QUESTION:
+USER QUESTION:
 {question}
+
+RESPONSE STYLE:
+If summary requested → give short summary
+If learning requested → explain what user will learn
+If difficulty asked → infer from description only
+If general → explain purpose of the book
 """
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -48,8 +54,8 @@ QUESTION:
     data = {
         "model": "llama-3.1-8b-instant",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,   # 🔥 reduce imagination
-        "max_tokens": 220
+        "temperature": 0.3,  # little naturalness but still safe
+        "max_tokens": 260
     }
 
     try:
@@ -60,9 +66,9 @@ QUESTION:
 
         answer = r.json()["choices"][0]["message"]["content"].strip()
 
-        # safety cleanup
-        if len(answer) < 15:
-            return "I could not confidently understand this book."
+        # cleanup overly tiny responses
+        if len(answer) < 20:
+            return "I could not confidently understand this book from available information."
 
         return answer
 

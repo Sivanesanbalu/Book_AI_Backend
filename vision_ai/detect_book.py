@@ -25,12 +25,24 @@ def detect_book_title(image_path):
     }
 
     prompt = """
-Look at this image of a book cover.
-Tell ONLY the book title and author.
-If unclear say UNKNOWN.
-Return short text only.
-"""
+You are reading a book cover image.
 
+Your job:
+Identify the MOST LIKELY book title and author.
+
+Rules:
+- Focus on large bold text
+- Ignore small subtitles
+- Ignore logos and stickers
+- If partially visible, intelligently guess the real book
+- Never say unknown unless absolutely impossible
+
+Return format:
+Title - Author
+
+Example:
+Clean Code - Robert C. Martin
+"""
     data = {
         "model": "llama-3.2-11b-vision-preview",
         "messages": [

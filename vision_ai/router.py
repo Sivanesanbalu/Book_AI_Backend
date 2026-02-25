@@ -27,19 +27,28 @@ async def understand_book(
         # STEP 1 — identify book
         title = detect_book_title(temp)
 
+        # 🔍 DEBUG RETURN (VERY IMPORTANT)
         if not title:
-            return {"answer": "I cannot read the book cover clearly"}
+            return {
+                "debug": "vision_failed",
+                "answer": "I cannot read the book cover clearly"
+            }
 
         # STEP 2 — search internet
         book_data = fetch_book_details(title)
 
         if not book_data:
-            return {"book": title, "answer": "Book found but details unavailable"}
+            return {
+                "debug": title,
+                "book": title,
+                "answer": "Book detected but details unavailable"
+            }
 
         # STEP 3 — explain
         explanation = explain_book(title, book_data, question)
 
         return {
+            "debug": title,
             "book": title,
             "answer": explanation
         }
