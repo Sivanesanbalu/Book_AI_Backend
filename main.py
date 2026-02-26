@@ -8,7 +8,7 @@ from PIL import Image
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.responses import JSONResponse
 
-import startup
+
 from image_search import search_book, add_book
 from firebase_service import save_book_for_user, user_has_book
 
