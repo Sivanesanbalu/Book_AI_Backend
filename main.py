@@ -101,24 +101,37 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
 
 
 # =========================================================
-# ➕ FLOW-1 → ADD BOOK
+# 📷 ADD BOOK  (FORCE SAVE / LEARN)
 # =========================================================
 @app.post("/add")
 async def add(uid: str = Query(...), file: UploadFile = File(...)):
-    path = save_temp(file)
+    path = None
+
+    try:
+        path = save_temp(file)
+    except ValueError:
+        return JSONResponse(status_code=413, content={"status": "file_too_large"})
 
     if not validate_image(path):
-        os.remove(path)
+        if os.path.exists(path):
+            os.remove(path)
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
+        # check already exists in AI DB
         book, score = await asyncio.to_thread(search_book, path)
 
+        # ---------- ALREADY KNOWN BOOK ----------
         if book is not None:
             title = book["title"]
+
+            if user_has_book(uid, title):
+                return {"status": "already_saved", "title": title}
+
             save_book_for_user(uid, title)
             return {"status": "saved_existing", "title": title}
 
+        # ---------- NEW BOOK ----------
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
         with index_lock:
@@ -128,8 +141,11 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
 
         return {"status": "saved_new", "title": unique_title}
 
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
     finally:
-        if os.path.exists(path):
+        if path and os.path.exists(path):
             os.remove(path)
 
 
