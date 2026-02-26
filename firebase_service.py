@@ -4,6 +4,7 @@ import hashlib
 import os
 import json
 import re
+import time
 
 # ---------------- INIT FIREBASE ----------------
 if not firebase_admin._apps:
@@ -20,16 +21,39 @@ db = firestore.client()
 
 
 # =========================================================
-# 🔐 VERIFY USER TOKEN  (CRITICAL FIX)
+# 🔐 TOKEN CACHE (CRITICAL RENDER FIX)
+# prevents cold start verification delay
 # =========================================================
+_last_verify = {}
+CACHE_SECONDS = 3600  # 1 hour
+
+
 def verify_user(id_token: str):
     """
     Verify Firebase ID token from Flutter Authorization header
     Returns uid or None
     """
+
+    if not id_token:
+        return None
+
+    # ---------- CACHE HIT ----------
+    if id_token in _last_verify:
+        uid, exp = _last_verify[id_token]
+        if time.time() < exp:
+            return uid
+
+    # ---------- VERIFY ----------
     try:
         decoded = auth.verify_id_token(id_token)
-        return decoded["uid"]
+
+        uid = decoded["uid"]
+
+        # cache it
+        _last_verify[id_token] = (uid, time.time() + CACHE_SECONDS)
+
+        return uid
+
     except Exception as e:
         print("🔥 Token verification failed:", e)
         return None
@@ -41,7 +65,7 @@ def verify_user(id_token: str):
 # =========================================================
 def normalize_title(title: str) -> str:
     title = title.lower().strip()
-    title = re.sub(r'[^a-z0-9]', '', title)  # remove spaces & symbols
+    title = re.sub(r'[^a-z0-9]', '', title)
     return title
 
 
@@ -69,12 +93,9 @@ def user_has_book(uid: str, title: str) -> bool:
 
 
 # =========================================================
-# 💾 SAVE BOOK FOR USER (ATOMIC — NO DUPLICATES)
+# 💾 SAVE BOOK FOR USER
 # =========================================================
 def save_book_for_user(uid: str, title: str):
-    """
-    Atomic save → Firestore document ID prevents duplicates automatically
-    """
 
     try:
         doc_ref = (
@@ -84,7 +105,6 @@ def save_book_for_user(uid: str, title: str):
             .document(book_id(title))
         )
 
-        # merge=True prevents overwrite + avoids race condition
         doc_ref.set({
             "title": title,
             "normalized": normalize_title(title),

@@ -2,13 +2,13 @@ import os
 import json
 import faiss
 import numpy as np
+import time
 from image_embedder import get_image_embedding
 from threading import Lock
 
 DATA_FILE = "data/books.json"
 DIM = 768
 
-# tuned real world thresholds
 MATCH_THRESHOLD = 0.72
 DUPLICATE_THRESHOLD = 0.87
 
@@ -17,12 +17,14 @@ os.makedirs("data", exist_ok=True)
 _books = []
 _index = None
 _lock = Lock()
-_loaded = False   # 🔥 LAZY FLAG
+_loaded = False   # lazy load flag
 
 
 # ---------------- NORMALIZE ----------------
 def normalize(v):
-    return v / np.linalg.norm(v, axis=1, keepdims=True)
+    norm = np.linalg.norm(v, axis=1, keepdims=True)
+    norm[norm == 0] = 1e-8
+    return v / norm
 
 
 # ---------------- REBUILD INDEX ----------------
@@ -35,7 +37,6 @@ def rebuild_index():
         return
 
     vectors = []
-
     for b in _books:
         if "embedding" in b:
             vec = np.array(b["embedding"], dtype="float32").reshape(1, -1)
@@ -59,10 +60,9 @@ def load_db():
     rebuild_index()
 
 
-# ---------------- ENSURE LOADED (LAZY INIT) ----------------
+# ---------------- ENSURE LOADED ----------------
 def ensure_loaded():
     global _loaded
-
     if _loaded:
         return
 
@@ -70,6 +70,25 @@ def ensure_loaded():
     load_db()
     _loaded = True
     print("✅ Book DB Ready")
+
+
+# ---------------- FORCE RELOAD ----------------
+def force_reload():
+    global _loaded
+    _loaded = False
+    ensure_loaded()
+
+
+# ---------------- WAIT UNTIL INDEX READY ----------------
+def wait_until_index_ready(timeout=5):
+    start = time.time()
+    while True:
+        if _index is not None and getattr(_index, "ntotal", 0) == len(_books):
+            return True
+        if time.time() - start > timeout:
+            print("⚠️ FAISS rebuild timeout")
+            return False
+        time.sleep(0.05)
 
 
 # ---------------- SAVE DB ----------------
@@ -83,9 +102,9 @@ def save_db():
 # ---------------- SEARCH BOOK ----------------
 def search_book(image_path):
 
-    ensure_loaded()  # 🔥 LAZY LOAD HERE
+    ensure_loaded()
 
-    if _index is None or _index.ntotal == 0:
+    if _index is None or getattr(_index, "ntotal", 0) == 0:
         return None, 0
 
     emb = get_image_embedding(image_path)
@@ -111,9 +130,7 @@ def search_book(image_path):
 # ---------------- ADD BOOK ----------------
 def add_book(image_path, title):
 
-    global _index
-
-    ensure_loaded()  # 🔥 LAZY LOAD HERE
+    ensure_loaded()
 
     emb = get_image_embedding(image_path)
     if emb is None:
@@ -123,19 +140,26 @@ def add_book(image_path, title):
 
     with _lock:
 
-        if _index is not None and _index.ntotal > 0:
+        # duplicate check
+        if _index is not None and getattr(_index, "ntotal", 0) > 0:
             D, _ = _index.search(emb, 1)
             if float(D[0][0]) > DUPLICATE_THRESHOLD:
                 print("⚠️ Already exists → not adding again")
                 return True
 
+        # add new book
         _books.append({
             "title": title,
             "embedding": emb.flatten().tolist()
         })
 
         save_db()
-        rebuild_index()
+
+        # rebuild index
+        force_reload()
+
+        # wait until ready
+        wait_until_index_ready()
 
     print("➕ Added:", title)
     return True

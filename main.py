@@ -5,12 +5,11 @@ import asyncio
 from threading import Lock
 from PIL import Image
 
-from fastapi import FastAPI, UploadFile, File, Query
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import JSONResponse
 
-
 from image_search import search_book, add_book
-from firebase_service import save_book_for_user, user_has_book
+from firebase_service import save_book_for_user, user_has_book, verify_user
 
 # -------- FLOW 2 IMPORTS --------
 from vision_ai.vision import detect_book
@@ -28,7 +27,20 @@ index_lock = Lock()
 
 
 # =========================================================
-# 🌍 HEALTH CHECK (IMPORTANT FOR RENDER)
+# 🔐 AUTH HELPER (CRITICAL FIX)
+# =========================================================
+async def get_uid(request: Request):
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header.split(" ")[1]
+    return verify_user(token)
+
+
+# =========================================================
+# 🌍 HEALTH CHECK
 # =========================================================
 @app.get("/")
 def root():
@@ -71,7 +83,12 @@ def save_temp(file: UploadFile):
 # 🔍 FLOW-1 → SCAN BOOK
 # =========================================================
 @app.post("/scan")
-async def scan(uid: str = Query(...), file: UploadFile = File(...)):
+async def scan(request: Request, file: UploadFile = File(...)):
+
+    uid = await get_uid(request)
+    if not uid:
+        return JSONResponse(status_code=401, content={"status": "unauthorized"})
+
     path = save_temp(file)
 
     if not validate_image(path):
@@ -101,10 +118,15 @@ async def scan(uid: str = Query(...), file: UploadFile = File(...)):
 
 
 # =========================================================
-# 📷 ADD BOOK  (FORCE SAVE / LEARN)
+# 📷 ADD BOOK (LEARN)
 # =========================================================
 @app.post("/add")
-async def add(uid: str = Query(...), file: UploadFile = File(...)):
+async def add(request: Request, file: UploadFile = File(...)):
+
+    uid = await get_uid(request)
+    if not uid:
+        return JSONResponse(status_code=401, content={"status": "unauthorized"})
+
     path = None
 
     try:
@@ -118,20 +140,20 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
         return JSONResponse(status_code=400, content={"status": "invalid_image"})
 
     try:
-        # check already exists in AI DB
+        # check already exists
         book, score = await asyncio.to_thread(search_book, path)
 
-        # ---------- ALREADY KNOWN BOOK ----------
+        # ---------- EXISTING ----------
         if book is not None:
             title = book["title"]
 
             if user_has_book(uid, title):
-                return {"status": "already_saved", "title": title, "already": True}
+                return {"status": "already_saved", "title": title}
 
             save_book_for_user(uid, title)
             return {"status": "saved_existing", "title": title}
 
-        # ---------- NEW BOOK ----------
+        # ---------- NEW ----------
         unique_title = f"Book_{uuid.uuid4().hex[:8]}"
 
         with index_lock:
@@ -150,43 +172,32 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
 
 
 # =========================================================
-# 🤖 FLOW-2 → ASK BOOK AI (VISION → SUMMARY)
+# 🤖 FLOW-2 → AI BOOK EXPLAIN
 # =========================================================
 @app.post("/ask-book-ai")
 async def ask_book_ai(file: UploadFile = File(...)):
+
     path = f"{UPLOAD_DIR}/{uuid.uuid4().hex}.jpg"
 
     try:
         contents = await file.read()
 
         if not contents:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Empty image uploaded"}
-            )
+            return JSONResponse(status_code=400, content={"error": "Empty image uploaded"})
 
         with open(path, "wb") as f:
             f.write(contents)
 
-        # Step 1: Vision (non-blocking)
         book_name = await asyncio.to_thread(detect_book, path)
 
         if not book_name:
-            return JSONResponse(
-                status_code=422,
-                content={"error": "Could not identify book"}
-            )
+            return JSONResponse(status_code=422, content={"error": "Could not identify book"})
 
-        # Step 2: Fetch info
         book = get_book_info(book_name)
 
         if not book:
-            return JSONResponse(
-                status_code=404,
-                content={"error": f"No info found for '{book_name}'"}
-            )
+            return JSONResponse(status_code=404, content={"error": f"No info found for '{book_name}'"})
 
-        # Step 3: Summarize (non-blocking)
         overview = await asyncio.to_thread(summarize_book, book)
 
         return {
@@ -195,10 +206,7 @@ async def ask_book_ai(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
     finally:
         if os.path.exists(path):
