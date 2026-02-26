@@ -126,7 +126,7 @@ async def add(uid: str = Query(...), file: UploadFile = File(...)):
             title = book["title"]
 
             if user_has_book(uid, title):
-                return {"status": "already_saved", "title": title}
+                return {"status": "already_saved", "title": title, "already": True}
 
             save_book_for_user(uid, title)
             return {"status": "saved_existing", "title": title}
