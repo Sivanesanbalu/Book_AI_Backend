@@ -6,22 +6,21 @@ from image_embedder import get_image_embedding
 from threading import Lock
 
 DATA_FILE = "data/books.json"
-INDEX_FILE = "data/books.faiss"
-
 DIM = 768
 
 # tuned real world thresholds
-MATCH_THRESHOLD = 0.72      # detect same book
-DUPLICATE_THRESHOLD = 0.87  # prevent re-adding same cover
+MATCH_THRESHOLD = 0.72
+DUPLICATE_THRESHOLD = 0.87
 
 os.makedirs("data", exist_ok=True)
 
 _books = []
 _index = None
 _lock = Lock()
+_loaded = False   # 🔥 LAZY FLAG
 
 
-# ---------------- NORMALIZE (VERY IMPORTANT) ----------------
+# ---------------- NORMALIZE ----------------
 def normalize(v):
     return v / np.linalg.norm(v, axis=1, keepdims=True)
 
@@ -60,6 +59,19 @@ def load_db():
     rebuild_index()
 
 
+# ---------------- ENSURE LOADED (LAZY INIT) ----------------
+def ensure_loaded():
+    global _loaded
+
+    if _loaded:
+        return
+
+    print("📚 Loading book database (first request only)...")
+    load_db()
+    _loaded = True
+    print("✅ Book DB Ready")
+
+
 # ---------------- SAVE DB ----------------
 def save_db():
     tmp = DATA_FILE + ".tmp"
@@ -68,13 +80,12 @@ def save_db():
     os.replace(tmp, DATA_FILE)
 
 
-load_db()
-
-
 # ---------------- SEARCH BOOK ----------------
 def search_book(image_path):
 
-    if _index.ntotal == 0:
+    ensure_loaded()  # 🔥 LAZY LOAD HERE
+
+    if _index is None or _index.ntotal == 0:
         return None, 0
 
     emb = get_image_embedding(image_path)
@@ -102,6 +113,8 @@ def add_book(image_path, title):
 
     global _index
 
+    ensure_loaded()  # 🔥 LAZY LOAD HERE
+
     emb = get_image_embedding(image_path)
     if emb is None:
         return False
@@ -110,22 +123,18 @@ def add_book(image_path, title):
 
     with _lock:
 
-        # duplicate detection
-        if _index.ntotal > 0:
+        if _index is not None and _index.ntotal > 0:
             D, _ = _index.search(emb, 1)
             if float(D[0][0]) > DUPLICATE_THRESHOLD:
                 print("⚠️ Already exists → not adding again")
-                return True   # IMPORTANT FIX
+                return True
 
-        # save embedding
         _books.append({
             "title": title,
             "embedding": emb.flatten().tolist()
         })
 
-        load_db()
-
-        # sync index
+        save_db()
         rebuild_index()
 
     print("➕ Added:", title)

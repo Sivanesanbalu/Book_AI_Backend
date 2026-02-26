@@ -4,17 +4,26 @@ from PIL import Image
 from torchvision import transforms
 import timm
 import os
+
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-# ---------------- MEMORY SAFE SETTINGS ----------------
+
 torch.set_num_threads(1)
 torch.backends.mkldnn.enabled = False
 
 device = "cpu"
 
-# -------- LIGHTWEIGHT BUT ACCURATE MODEL --------
-model = timm.create_model("convnext_tiny", pretrained=True, num_classes=0)
-model.eval()
-model.to(device)
+# ---------------- LAZY MODEL ----------------
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        print("🧠 Loading AI vision model (first request only)...")
+        model = timm.create_model("convnext_tiny", pretrained=True, num_classes=0)
+        model.eval()
+        model.to(device)
+        print("✅ Vision model ready")
+    return model
 
 
 # -------- TRANSFORM --------
@@ -29,14 +38,12 @@ transform = transforms.Compose([
 ])
 
 
-# -------- NORMALIZE VECTOR --------
 def normalize(v):
     norm = np.linalg.norm(v, axis=1, keepdims=True)
     norm[norm == 0] = 1e-8
     return v / norm
 
 
-# -------- LIGHTING NORMALIZATION --------
 def remove_lighting(img):
     arr = np.array(img).astype("float32")
     mean = arr.mean()
@@ -45,8 +52,8 @@ def remove_lighting(img):
     return Image.fromarray(arr.astype("uint8"))
 
 
-# -------- EMBEDDING --------
 def extract(img):
+    model = get_model()   # 🔥 LAZY LOAD HERE
     tensor = transform(img).unsqueeze(0).to(device)
     with torch.no_grad():
         emb = model(tensor).cpu().numpy().astype("float32")
@@ -55,21 +62,17 @@ def extract(img):
 
 def get_image_embedding(path):
     try:
-        # safe open (prevents memory leak)
         img = Image.open(path)
         img.load()
         img = img.convert("RGB")
         img = img.copy()
 
-        # remove lighting differences
         img = remove_lighting(img)
 
         embeddings = []
 
-        # original
         embeddings.append(extract(img))
 
-        # slight zoom crop (real world camera variation)
         w, h = img.size
         crop = img.crop((w*0.12, h*0.12, w*0.88, h*0.88))
         embeddings.append(extract(crop))
