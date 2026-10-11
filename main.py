@@ -418,7 +418,7 @@ async def api_update_profile(request: Request, payload: dict = Body(...)):
 @app.get("/api/network-info")
 def get_network_info():
     """
-    Returns the Mac's local network IP for instant mobile phone access
+    Returns the public HTTPS tunnel URL or Mac's local network IP for mobile phone access
     """
     local_ip = "127.0.0.1"
     try:
@@ -431,10 +431,24 @@ def get_network_info():
         local_ip = "10.16.201.1"
 
     port = 8000
-    mobile_url = f"http://{local_ip}:{port}"
+    public_url = None
+    if os.path.exists("/tmp/cloudflared.log"):
+        try:
+            import re
+            with open("/tmp/cloudflared.log") as f:
+                content = f.read()
+                matches = re.findall(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", content)
+                if matches:
+                    public_url = matches[-1]
+        except Exception:
+            pass
+
+    mobile_url = public_url if public_url else f"http://{local_ip}:{port}"
+
     return {
         "local_ip": local_ip,
         "port": port,
+        "public_url": public_url,
         "mobile_url": mobile_url,
         "instructions": "Scan the QR Code on your mobile phone or open the mobile URL in Safari/Chrome."
     }
