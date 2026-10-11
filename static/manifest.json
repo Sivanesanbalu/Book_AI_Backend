@@ -1,0 +1,22 @@
+{
+  "name": "BookNest AI - Visual Scanner & Story Assistant",
+  "short_name": "BookNest AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0d14",
+  "theme_color": "#6366f1",
+  "description": "Visual book cover scanner, personal database verifier, and AI story companion.",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=192&q=80",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=512&q=80",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
