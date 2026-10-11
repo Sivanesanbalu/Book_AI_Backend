@@ -110,6 +110,19 @@ def manifest():
     return JSONResponse(status_code=404, content={"error": "manifest not found"})
 
 
+@app.get("/download")
+@app.get("/BookNestAI.apk")
+def download_apk():
+    apk_path = "static/BookNestAI.apk"
+    if os.path.exists(apk_path):
+        return FileResponse(
+            apk_path,
+            media_type="application/vnd.android.package-archive",
+            filename="BookNestAI.apk"
+        )
+    return JSONResponse(status_code=404, content={"error": "APK not found"})
+
+
 @app.get("/sw.js")
 def service_worker():
     if os.path.exists("static/sw.js"):
