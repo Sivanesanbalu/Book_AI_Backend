@@ -151,9 +151,13 @@ function switchToTab(targetTab) {
     else t.classList.remove('active');
   });
 
+  // Hide floating AI bot on Scanner tab so viewfinder and controls are completely unobstructed
+  const aiBotWrapper = document.getElementById('ai-bot-wrapper');
   if (targetTab === 'tab-scan') {
+    if (aiBotWrapper) aiBotWrapper.style.display = 'none';
     if (!currentStream) initCamera();
   } else {
+    if (aiBotWrapper) aiBotWrapper.style.display = 'flex';
     stopCamera();
   }
 
@@ -504,6 +508,16 @@ async function captureAndScan() {
     return;
   }
 
+  // Haptic feedback & shutter flash animation
+  if (navigator.vibrate) {
+    try { navigator.vibrate(50); } catch (_) {}
+  }
+  const viewport = document.querySelector('.scanner-viewport');
+  if (viewport) {
+    viewport.classList.add('shutter-flash');
+    setTimeout(() => viewport.classList.remove('shutter-flash'), 250);
+  }
+
   // Fast client-side resize for instant upload & recognition
   const maxDim = 800;
   let w = videoEl.videoWidth;
@@ -716,6 +730,15 @@ function displayScanResult(data) {
   }
 
   document.getElementById('open-ai-chat-btn').onclick = () => openChatForBook(activeBook);
+
+  const scanAnotherBtn = document.getElementById('scan-another-btn');
+  if (scanAnotherBtn) {
+    scanAnotherBtn.onclick = () => {
+      const resultCard = document.getElementById('scan-result-card');
+      if (resultCard) resultCard.style.display = 'none';
+      document.querySelector('.scanner-viewport')?.scrollIntoView({ behavior: 'smooth' });
+    };
+  }
 }
 
 async function saveActiveBook() {
@@ -1869,7 +1892,11 @@ function updateDashboardView() {
       wishContainer.style.display = 'flex';
       if (noWishPlaceholder) noWishPlaceholder.style.display = 'none';
 
-      wishContainer.innerHTML = wishlistBooks.map(b => `
+      // Curate top 8 books for the quick dashboard carousel with 1:1 indicator dots
+      const displayBooks = wishlistBooks.slice(0, 8);
+      const hasMore = wishlistBooks.length > 8;
+
+      let cardsHtml = displayBooks.map(b => `
         <div class="wishlist-card 3d-card" onclick="openBookModal('${encodeURIComponent(b.title)}')">
           <img src="${b.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=200&q=80'}" class="wishlist-card-cover" alt="cover">
           <div class="wishlist-card-title">${escapeHtml(b.title)}</div>
@@ -1880,14 +1907,32 @@ function updateDashboardView() {
         </div>
       `).join('');
 
+      if (hasMore) {
+        cardsHtml += `
+          <div class="wishlist-card wishlist-more-card 3d-card" id="wishlist-see-all-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; min-height: 200px; background: rgba(99, 102, 241, 0.05); border: 2px dashed rgba(99, 102, 241, 0.3);">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">📚</div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--accent-primary);">+${wishlistBooks.length - 8} More Books</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Tap to view all in Library</div>
+          </div>
+        `;
+      }
+
+      wishContainer.innerHTML = cardsHtml;
+
+      document.getElementById('wishlist-see-all-card')?.addEventListener('click', () => {
+        switchToTab('tab-library');
+        const wishChip = document.querySelector('.filter-btn[data-status-filter="Wishlist"]');
+        if (wishChip) wishChip.click();
+      });
+
       // Populate Wishlist Carousel Pagination Dots ("Point Dot Mathiri")
       const dotsContainer = document.getElementById('wishlist-dots-container');
+      const totalCards = displayBooks.length + (hasMore ? 1 : 0);
       if (dotsContainer) {
-        if (wishlistBooks.length > 1) {
+        if (totalCards > 1) {
           dotsContainer.style.display = 'flex';
-          const maxDots = Math.min(wishlistBooks.length, 8);
-          dotsContainer.innerHTML = Array.from({ length: maxDots }, (_, i) => `
-            <span class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot-idx="${i}"></span>
+          dotsContainer.innerHTML = Array.from({ length: totalCards }, (_, i) => `
+            <span class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot-idx="${i}" title="Card ${i + 1}"></span>
           `).join('');
 
           // Click dot to smooth scroll card into center
@@ -1926,9 +1971,8 @@ function updateDashboardView() {
                     closestIdx = idx;
                   }
                 });
-                const activeIdx = Math.min(dots.length - 1, closestIdx);
                 dots.forEach((d, i) => {
-                  if (i === activeIdx) d.classList.add('active');
+                  if (i === closestIdx) d.classList.add('active');
                   else d.classList.remove('active');
                 });
               }

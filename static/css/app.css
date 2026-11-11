@@ -730,6 +730,64 @@ body::before {
 .lens-bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 16px; }
 .lens-br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 16px; }
 
+.lens-target-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 42px;
+  height: 42px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.7));
+  animation: reticleSpin 12s linear infinite;
+}
+
+@keyframes reticleSpin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.lens-target-crosshair::before,
+.lens-target-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.lens-target-crosshair::before {
+  top: 50%;
+  left: -8px;
+  right: -8px;
+  height: 1.5px;
+  transform: translateY(-50%);
+}
+
+.lens-target-crosshair::after {
+  left: 50%;
+  top: -8px;
+  bottom: -8px;
+  width: 1.5px;
+  transform: translateX(-50%);
+}
+
+.scanner-viewport.shutter-flash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  z-index: 50;
+  pointer-events: none;
+  animation: flashFade 0.25s ease-out forwards;
+}
+
+@keyframes flashFade {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
 .lens-scan-line {
   position: absolute;
   left: 6px;
@@ -2428,28 +2486,33 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 12px 0 4px;
+  gap: 8px;
+  padding: 14px 0 6px;
+  width: 100%;
 }
 
 .carousel-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: rgba(99, 102, 241, 0.22);
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.28);
+  border: 1px solid rgba(99, 102, 241, 0.15);
   cursor: pointer;
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] .carousel-dot {
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .carousel-dot.active {
   width: 24px;
+  height: 8px;
   border-radius: 999px;
-  background: var(--accent-primary);
-  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.5);
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.5);
+  border-color: transparent;
 }
 
 .wishlist-card {
