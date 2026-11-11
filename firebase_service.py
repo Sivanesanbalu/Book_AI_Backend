@@ -267,15 +267,35 @@ def get_user_profile(uid: str):
 
             profile = dict(user_row)
             book_count = conn.execute("SELECT COUNT(*) as count FROM user_books WHERE uid = ?", (uid,)).fetchone()["count"]
+            completed_count = conn.execute(
+                "SELECT COUNT(*) as count FROM user_books WHERE uid = ? AND (LOWER(status) LIKE '%finish%' OR LOWER(status) LIKE '%complet%')",
+                (uid,)
+            ).fetchone()["count"]
+            reading_count = conn.execute(
+                "SELECT COUNT(*) as count FROM user_books WHERE uid = ? AND LOWER(status) LIKE '%read%' AND NOT LOWER(status) LIKE '%finish%' AND NOT LOWER(status) LIKE '%complet%'",
+                (uid,)
+            ).fetchone()["count"]
+            wishlist_count = conn.execute(
+                "SELECT COUNT(*) as count FROM user_books WHERE uid = ? AND (LOWER(status) LIKE '%wish%' OR LOWER(status) LIKE '%want%')",
+                (uid,)
+            ).fetchone()["count"]
             scan_count = conn.execute("SELECT COUNT(*) as count FROM scan_logs WHERE uid = ?", (uid,)).fetchone()["count"]
 
+            # Distinct categories
+            genres_rows = conn.execute("SELECT DISTINCT genre FROM user_books WHERE uid = ? AND genre IS NOT NULL AND genre != ''", (uid,)).fetchall()
+            categories = [r["genre"] for r in genres_rows]
+
             profile["total_books"] = book_count
+            profile["completed_books"] = completed_count
+            profile["reading_books"] = reading_count
+            profile["wishlist_books"] = wishlist_count
             profile["total_scans"] = scan_count
+            profile["categories"] = categories
             profile["backend_mode"] = "Firestore Cloud" if use_firestore else "Local SQLite Engine"
             return profile
 
 
-def update_user_profile(uid: str, name: str = None, email: str = None, reading_goal: int = None, favorite_genres: str = None):
+def update_user_profile(uid: str, name: str = None, email: str = None, reading_goal: int = None, favorite_genres: str = None, avatar: str = None):
     with _db_lock:
         with get_sqlite_conn() as conn:
             updates = []
@@ -292,6 +312,9 @@ def update_user_profile(uid: str, name: str = None, email: str = None, reading_g
             if favorite_genres is not None:
                 updates.append("favorite_genres = ?")
                 params.append(favorite_genres)
+            if avatar is not None:
+                updates.append("avatar = ?")
+                params.append(avatar)
 
             if updates:
                 params.append(uid)
@@ -299,4 +322,43 @@ def update_user_profile(uid: str, name: str = None, email: str = None, reading_g
                 conn.execute(sql, params)
                 conn.commit()
 
+    return get_user_profile(uid)
+
+
+def update_book_status(uid: str, title: str, status: str = None, rating: int = None, genre: str = None):
+    b_id = book_id(title)
+    with _db_lock:
+        with get_sqlite_conn() as conn:
+            updates = []
+            params = []
+            if status is not None:
+                updates.append("status = ?")
+                params.append(status)
+            if rating is not None:
+                updates.append("rating = ?")
+                params.append(rating)
+            if genre is not None:
+                updates.append("genre = ?")
+                params.append(genre)
+
+            if updates:
+                params.extend([uid, b_id])
+                sql = f"UPDATE user_books SET {', '.join(updates)} WHERE uid = ? AND book_id = ?"
+                conn.execute(sql, params)
+                conn.commit()
+    return True
+
+
+def upsert_google_user(uid: str, name: str, email: str, avatar: str = None):
+    with _db_lock:
+        with get_sqlite_conn() as conn:
+            conn.execute("""
+            INSERT INTO users (uid, name, email, avatar)
+            VALUES (?, ?, ?, COALESCE(?, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'))
+            ON CONFLICT(uid) DO UPDATE SET
+                name = COALESCE(excluded.name, users.name),
+                email = COALESCE(excluded.email, users.email),
+                avatar = COALESCE(excluded.avatar, users.avatar)
+            """, (uid, name, email, avatar))
+            conn.commit()
     return get_user_profile(uid)

@@ -20,7 +20,9 @@ from firebase_service import (
     remove_book_for_user,
     log_scan_event,
     get_user_profile,
-    update_user_profile
+    update_user_profile,
+    update_book_status,
+    upsert_google_user
 )
 
 # -------- FLOW 2 & VISION IMPORTS --------
@@ -402,9 +404,35 @@ async def api_remove_library(request: Request, title: str = Query(...)):
     return {"status": "removed", "title": title}
 
 
+@app.post("/api/library/update")
+async def api_update_library(request: Request, payload: dict = Body(...)):
+    uid = await get_uid(request)
+    title = payload.get("title")
+    if not title:
+        return JSONResponse(status_code=400, content={"error": "title is required"})
+    update_book_status(
+        uid=uid,
+        title=title,
+        status=payload.get("status"),
+        rating=payload.get("rating"),
+        genre=payload.get("genre")
+    )
+    return {"status": "updated", "title": title}
+
+
 # =========================================================
-# 👤 USER PROFILE API
+# 👤 USER PROFILE & AUTH API
 # =========================================================
+@app.post("/api/auth/google")
+async def api_google_auth(payload: dict = Body(...)):
+    uid = payload.get("uid") or payload.get("sub") or payload.get("email") or "google_user"
+    name = payload.get("name") or "Reader"
+    email = payload.get("email") or "reader@google.com"
+    avatar = payload.get("picture") or payload.get("avatar")
+    profile = upsert_google_user(uid=uid, name=name, email=email, avatar=avatar)
+    return {"status": "authenticated", "uid": uid, "profile": profile}
+
+
 @app.get("/api/profile")
 async def api_profile(request: Request):
     uid = await get_uid(request)
@@ -420,9 +448,23 @@ async def api_update_profile(request: Request, payload: dict = Body(...)):
         name=payload.get("name"),
         email=payload.get("email"),
         reading_goal=payload.get("reading_goal"),
-        favorite_genres=payload.get("favorite_genres")
+        favorite_genres=payload.get("favorite_genres"),
+        avatar=payload.get("avatar")
     )
     return profile
+
+
+@app.post("/api/profile/avatar")
+async def api_upload_avatar(request: Request, file: UploadFile = File(...)):
+    uid = await get_uid(request)
+    os.makedirs("static/avatars", exist_ok=True)
+    filename = f"{uuid.uuid4().hex}_{file.filename}"
+    filepath = os.path.join("static/avatars", filename)
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    avatar_url = f"/static/avatars/{filename}"
+    profile = update_user_profile(uid=uid, avatar=avatar_url)
+    return {"status": "uploaded", "avatar_url": avatar_url, "profile": profile}
 
 
 # =========================================================

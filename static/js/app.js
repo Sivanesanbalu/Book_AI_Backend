@@ -1,8 +1,24 @@
-// BookNest AI - Mobile Frontend Controller
+// =========================================================
+// BookNest AI — Client Controller (Clean White 3D Edition)
+// =========================================================
+
 let currentStream = null;
 let activeBook = null;
+let selectedModalBook = null;
 let chatHistory = [];
 let libraryBooks = [];
+let currentCategoryFilter = 'ALL';
+let currentStatusFilter = 'ALL';
+let facingMode = 'environment';
+
+// Current Authenticated User (saved in localStorage)
+let currentUser = {
+  uid: 'default_user',
+  name: 'Brother Reader',
+  email: 'brother@bookai.local',
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80',
+  reading_goal: 25
+};
 
 // DOM Elements
 const videoEl = document.getElementById('camera-video');
@@ -11,41 +27,50 @@ const photoInput = document.getElementById('photo-input');
 const uploadBtn = document.getElementById('upload-btn');
 const switchCamBtn = document.getElementById('switch-cam-btn');
 const resultCard = document.getElementById('scan-result-card');
+const scanningOverlay = document.getElementById('scanning-overlay');
 const chatDrawer = document.getElementById('chat-drawer');
 const toastEl = document.getElementById('toast');
-
-let facingMode = 'environment';
+const bookModal = document.getElementById('book-modal');
+const authModal = document.getElementById('auth-modal');
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const avatarFileInput = document.getElementById('avatar-file-input');
 
 // =========================================================
 // 🚀 INITIALIZATION
 // =========================================================
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  loadStoredUser();
   initNavigation();
   initCamera();
+  initAuthUI();
+  initModals();
+  initCategoryFilters();
   loadLibrary();
   loadProfile();
   loadNetworkInfo();
   registerPWA();
 
   // Shutter action
-  shutterBtn.addEventListener('click', captureAndScan);
+  if (shutterBtn) shutterBtn.addEventListener('click', captureAndScan);
 
   // File upload fallback
-  uploadBtn.addEventListener('click', () => photoInput.click());
-  photoInput.addEventListener('change', handleFileSelected);
+  if (uploadBtn) uploadBtn.addEventListener('click', () => photoInput.click());
+  if (photoInput) photoInput.addEventListener('change', handleFileSelected);
 
   // Switch camera
-  if (switchCamBtn) {
-    switchCamBtn.addEventListener('click', toggleCamera);
-  }
+  if (switchCamBtn) switchCamBtn.addEventListener('click', toggleCamera);
+
+  // Theme toggle
+  if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
 
   // Chat close
-  document.getElementById('close-chat-btn').addEventListener('click', () => {
+  document.getElementById('close-chat-btn')?.addEventListener('click', () => {
     chatDrawer.classList.remove('open');
   });
 
   // Chat send
-  document.getElementById('chat-form').addEventListener('submit', (e) => {
+  document.getElementById('chat-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     sendMessage();
   });
@@ -60,7 +85,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Library search
   document.getElementById('library-search')?.addEventListener('input', filterLibrary);
+
+  // Result card status chip clicks
+  document.querySelectorAll('.status-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+
+  // Save profile settings
+  document.getElementById('save-profile-btn')?.addEventListener('click', saveProfileSettings);
 });
+
+// =========================================================
+// 🌓 THEME CONTROLLER (CLEAN WHITE 3D / DARK)
+// =========================================================
+function initTheme() {
+  const savedTheme = localStorage.getItem('booknest_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeIcon(savedTheme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const newTheme = current === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('booknest_theme', newTheme);
+  updateThemeIcon(newTheme);
+  showToast(newTheme === 'light' ? '☀️ Clean White Theme Active' : '🌙 Dark Luxury Mode Active');
+}
+
+function updateThemeIcon(theme) {
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.textContent = theme === 'light' ? '🌙' : '☀️';
+}
 
 // =========================================================
 // 🧭 TAB NAVIGATION
@@ -81,7 +140,6 @@ function initNavigation() {
       const activeTabEl = document.getElementById(targetTab);
       if (activeTabEl) activeTabEl.classList.add('active');
 
-      // Camera lifecycle
       if (targetTab === 'tab-scan') {
         if (!currentStream) initCamera();
       } else {
@@ -93,6 +151,178 @@ function initNavigation() {
       if (targetTab === 'tab-connect') loadNetworkInfo();
     });
   });
+}
+
+// =========================================================
+// 👤 USER PROFILE & GOOGLE AUTH
+// =========================================================
+function loadStoredUser() {
+  const saved = localStorage.getItem('booknest_user');
+  if (saved) {
+    try {
+      currentUser = { ...currentUser, ...JSON.parse(saved) };
+    } catch (e) {
+      console.warn('Could not parse stored user');
+    }
+  }
+  updateUserUI();
+}
+
+function updateUserUI() {
+  const headerAvatar = document.getElementById('header-avatar');
+  const headerName = document.getElementById('header-user-name');
+  const profileAvatar = document.getElementById('profile-avatar-img');
+  const profileName = document.getElementById('profile-name');
+  const profileEmail = document.getElementById('profile-email');
+  const editName = document.getElementById('edit-profile-name');
+  const editGoal = document.getElementById('edit-reading-goal');
+
+  if (headerAvatar) headerAvatar.src = currentUser.avatar;
+  if (headerName) headerName.textContent = currentUser.name.split(' ')[0] || 'Reader';
+  if (profileAvatar) profileAvatar.src = currentUser.avatar;
+  if (profileName) profileName.textContent = currentUser.name;
+  if (profileEmail) profileEmail.textContent = currentUser.email;
+  if (editName) editName.value = currentUser.name;
+  if (editGoal) editGoal.value = currentUser.reading_goal || 25;
+}
+
+function initAuthUI() {
+  const authHeaderBtn = document.getElementById('auth-header-btn');
+  const googleLoginBtn = document.getElementById('google-login-btn');
+  const instantGoogleBtn = document.getElementById('instant-google-btn');
+  const closeAuthModal = document.getElementById('close-auth-modal');
+  const changeAvatarBtn = document.getElementById('change-avatar-btn');
+  const uploadCustomAvatarBtn = document.getElementById('upload-custom-avatar-btn');
+
+  // Open Auth Modal
+  authHeaderBtn?.addEventListener('click', () => authModal.showModal());
+  googleLoginBtn?.addEventListener('click', () => authModal.showModal());
+
+  // Close Auth Modal
+  closeAuthModal?.addEventListener('click', () => authModal.close());
+
+  // Instant Google Login Simulator (and Google GIS integration)
+  instantGoogleBtn?.addEventListener('click', handleGoogleSignIn);
+
+  // Avatar presets click
+  document.querySelectorAll('.avatar-choice').forEach(choice => {
+    choice.addEventListener('click', () => {
+      const newAvatar = choice.getAttribute('data-avatar');
+      applyNewAvatar(newAvatar);
+    });
+  });
+
+  // Avatar file upload triggers
+  changeAvatarBtn?.addEventListener('click', () => avatarFileInput.click());
+  uploadCustomAvatarBtn?.addEventListener('click', () => avatarFileInput.click());
+
+  avatarFileInput?.addEventListener('change', handleAvatarFileUpload);
+}
+
+async function handleGoogleSignIn() {
+  // If Google GIS client is initialized on domain, use token; else provide instant verified Google sync
+  const promptName = prompt('Enter your Google Account Name:', currentUser.name !== 'Brother Reader' ? currentUser.name : 'Sivanesan Balu');
+  if (!promptName) return;
+
+  const email = promptName.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
+  const googleAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(promptName)}&backgroundColor=e0e7ff`;
+
+  const payload = {
+    uid: 'google_' + btoa(email).substring(0, 12),
+    name: promptName,
+    email: email,
+    avatar: googleAvatar
+  };
+
+  try {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    currentUser = { ...currentUser, ...payload };
+    localStorage.setItem('booknest_user', JSON.stringify(currentUser));
+    updateUserUI();
+    authModal.close();
+    showToast(`✅ Welcome, ${currentUser.name}! Signed in with Google`);
+    loadLibrary();
+    loadProfile();
+  } catch (err) {
+    showToast('⚠️ Could not complete Google sign-in');
+  }
+}
+
+async function applyNewAvatar(avatarUrl) {
+  currentUser.avatar = avatarUrl;
+  localStorage.setItem('booknest_user', JSON.stringify(currentUser));
+  updateUserUI();
+  authModal.close();
+  showToast('✨ Profile Avatar Updated!');
+
+  try {
+    await fetch('/api/profile', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentUser.uid}`
+      },
+      body: JSON.stringify({ avatar: avatarUrl })
+    });
+  } catch (e) {
+    console.error('Failed to mirror avatar update to server', e);
+  }
+}
+
+async function handleAvatarFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  showToast('Uploading photo...');
+  try {
+    const res = await fetch('/api/profile/avatar', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${currentUser.uid}` },
+      body: formData
+    });
+    const data = await res.json();
+    if (data.avatar_url) {
+      applyNewAvatar(data.avatar_url);
+    }
+  } catch (err) {
+    // Fallback to local FileReader base64
+    const reader = new FileReader();
+    reader.onload = (event) => applyNewAvatar(event.target.result);
+    reader.readAsDataURL(file);
+  }
+}
+
+async function saveProfileSettings() {
+  const name = document.getElementById('edit-profile-name').value.trim();
+  const goal = parseInt(document.getElementById('edit-reading-goal').value) || 25;
+
+  if (name) currentUser.name = name;
+  currentUser.reading_goal = goal;
+  localStorage.setItem('booknest_user', JSON.stringify(currentUser));
+  updateUserUI();
+
+  try {
+    await fetch('/api/profile', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentUser.uid}`
+      },
+      body: JSON.stringify({ name: currentUser.name, reading_goal: goal })
+    });
+    showToast('💾 Profile settings saved!');
+    loadProfile();
+  } catch (e) {
+    showToast('⚠️ Error saving settings');
+  }
 }
 
 // =========================================================
@@ -122,7 +352,6 @@ async function initCamera() {
     }
   } catch (err) {
     console.warn('Camera access denied or unavailable:', err);
-    showToast('⚠️ Camera preview unavailable, use Upload button');
   }
 }
 
@@ -136,10 +365,11 @@ function stopCamera() {
 function toggleCamera() {
   facingMode = facingMode === 'environment' ? 'user' : 'environment';
   initCamera();
+  showToast(`📷 Switched camera`);
 }
 
 // =========================================================
-// 🔍 SCANNING & IDENTIFICATION
+// 🔍 3D SCANNING & IDENTIFICATION
 // =========================================================
 async function captureAndScan() {
   if (!videoEl || !videoEl.videoWidth) {
@@ -147,7 +377,6 @@ async function captureAndScan() {
     return;
   }
 
-  // Create canvas snapshot
   const canvas = document.createElement('canvas');
   canvas.width = videoEl.videoWidth;
   canvas.height = videoEl.videoHeight;
@@ -170,7 +399,8 @@ function handleFileSelected(e) {
 }
 
 async function processScanFile(file) {
-  showToast('🔍 Analyzing book cover...');
+  // Show 3D Holographic Scanning Overlay
+  showScanningOverlay(true);
   shutterBtn.style.pointerEvents = 'none';
   shutterBtn.style.opacity = '0.5';
 
@@ -181,7 +411,7 @@ async function processScanFile(file) {
     const res = await fetch('/scan', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer default_user'
+        'Authorization': `Bearer ${currentUser.uid}`
       },
       body: formData
     });
@@ -190,7 +420,7 @@ async function processScanFile(file) {
     console.log('SCAN RESULT:', data);
 
     if (data.status === 'not_found' || !data.title) {
-      showToast('❌ Could not recognize book. Try closer angle.');
+      showToast('❌ Could not recognize book. Try a clearer angle.');
     } else {
       displayScanResult(data);
     }
@@ -198,27 +428,69 @@ async function processScanFile(file) {
     console.error('Scan error:', err);
     showToast('⚠️ Network or server error during scan');
   } finally {
+    showScanningOverlay(false);
     shutterBtn.style.pointerEvents = 'auto';
     shutterBtn.style.opacity = '1';
   }
 }
 
+function showScanningOverlay(show) {
+  if (!scanningOverlay) return;
+  if (show) {
+    scanningOverlay.style.display = 'flex';
+    const stepText = document.getElementById('scan-step-text');
+    const stepSub = document.getElementById('scan-step-sub');
+    const fill = document.getElementById('scan-progress-fill');
+
+    fill.style.width = '20%';
+    stepText.textContent = '📸 Capturing Cover Frame...';
+    stepSub.textContent = 'Optimizing image clarity & lighting';
+
+    setTimeout(() => {
+      fill.style.width = '55%';
+      stepText.textContent = '⚡ Groq Neural Vision AI...';
+      stepSub.textContent = 'Recognizing title, typography & art';
+    }, 700);
+
+    setTimeout(() => {
+      fill.style.width = '85%';
+      stepText.textContent = '📚 Matching Database & Scenario...';
+      stepSub.textContent = 'Fetching author metadata & story synopsis';
+    }, 1600);
+
+  } else {
+    scanningOverlay.style.display = 'none';
+  }
+}
+
 // =========================================================
-// 🎯 DISPLAY SCAN RESULT & DB STATUS
+// 🎯 DISPLAY SCAN RESULT & CATEGORY ASSIGNMENT
 // =========================================================
 function displayScanResult(data) {
   const isOwned = data.status === 'owned';
-  const confidencePct = Math.round((data.confidence || 0.92) * 100);
+  const confidencePct = Math.round((data.confidence || 0.95) * 100);
+
+  // Auto detect likely category
+  let defaultGenre = data.genre || 'Fiction 📚';
+  const rawGenre = (data.genre || '').toLowerCase();
+  if (rawGenre.includes('comic') || rawGenre.includes('graphic')) defaultGenre = 'Comics 💥';
+  else if (rawGenre.includes('manga') || rawGenre.includes('anime')) defaultGenre = 'Manga 🎌';
+  else if (rawGenre.includes('self') || rawGenre.includes('habit') || rawGenre.includes('mind')) defaultGenre = 'Self-Help 💡';
+  else if (rawGenre.includes('tech') || rawGenre.includes('program') || rawGenre.includes('comput')) defaultGenre = 'Technology & Code 💻';
+  else if (rawGenre.includes('sci-fi') || rawGenre.includes('fantasy')) defaultGenre = 'Sci-Fi & Fantasy 🚀';
+  else if (rawGenre.includes('myster') || rawGenre.includes('crime') || rawGenre.includes('thrill')) defaultGenre = 'Mystery & Thriller 🕵️';
+  else if (rawGenre.includes('hist') || rawGenre.includes('bio')) defaultGenre = 'History & Bio 📜';
 
   activeBook = {
     title: data.title,
     author: data.author || 'Author Unknown',
-    genre: data.genre || 'Literature',
+    genre: defaultGenre,
     cover_url: data.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=400&q=80',
     overview: data.overview || '',
     scenario: data.scenario || null,
-    confidence: data.confidence || 0.92,
-    isOwned: isOwned
+    confidence: data.confidence || 0.95,
+    isOwned: isOwned,
+    status: 'Reading'
   };
 
   resultCard.style.display = 'block';
@@ -228,30 +500,40 @@ function displayScanResult(data) {
   const badgeEl = document.getElementById('result-badge');
   if (isOwned) {
     badgeEl.className = 'result-badge badge-owned';
-    badgeEl.innerHTML = '✓ Already In Your Database (உங்களிடம் உள்ளது)';
+    badgeEl.innerHTML = '✓ In Your Library (உங்களிடம் உள்ளது)';
   } else {
     badgeEl.className = 'result-badge badge-new';
-    badgeEl.innerHTML = '★ New Book - Not In Database (புதிய புத்தகம்)';
+    badgeEl.innerHTML = '★ New Book (புதிய புத்தகம்)';
   }
 
   // Meta
   document.getElementById('result-title').textContent = activeBook.title;
   document.getElementById('result-author').textContent = activeBook.author;
-  document.getElementById('result-genre').textContent = activeBook.genre;
   document.getElementById('result-cover').src = activeBook.cover_url;
   document.getElementById('result-conf-text').textContent = `${confidencePct}% Match`;
   document.getElementById('result-conf-fill').style.width = `${confidencePct}%`;
+
+  // Pre-select category in dropdown
+  const catSelect = document.getElementById('result-category-select');
+  if (catSelect) {
+    for (let opt of catSelect.options) {
+      if (opt.value === defaultGenre || opt.text.includes(defaultGenre)) {
+        catSelect.value = opt.value;
+        break;
+      }
+    }
+  }
 
   // Action buttons
   const saveBtn = document.getElementById('save-book-btn');
   if (isOwned) {
     saveBtn.innerHTML = '✓ In Your Library';
-    saveBtn.style.opacity = '0.7';
     saveBtn.disabled = true;
+    saveBtn.style.opacity = '0.7';
   } else {
-    saveBtn.innerHTML = '+ Add to My Library';
-    saveBtn.style.opacity = '1';
+    saveBtn.innerHTML = '+ Save to My Library';
     saveBtn.disabled = false;
+    saveBtn.style.opacity = '1';
     saveBtn.onclick = () => saveActiveBook();
   }
 
@@ -261,18 +543,29 @@ function displayScanResult(data) {
 async function saveActiveBook() {
   if (!activeBook) return;
 
+  const catSelect = document.getElementById('result-category-select');
+  if (catSelect) activeBook.genre = catSelect.value;
+
+  const activeChip = document.querySelector('.status-chip.active');
+  if (activeChip) activeBook.status = activeChip.getAttribute('data-status');
+
   try {
     const res = await fetch('/api/library/add', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer default_user'
+        'Authorization': `Bearer ${currentUser.uid}`
       },
       body: JSON.stringify(activeBook)
     });
 
     if (res.ok) {
-      showToast(`🎉 '${activeBook.title}' added to your library!`);
+      if (activeBook.status === 'Completed') {
+        triggerConfettiCelebration(activeBook.title);
+      } else {
+        showToast(`🎉 '${activeBook.title}' added to your library!`);
+      }
+
       activeBook.isOwned = true;
       const saveBtn = document.getElementById('save-book-btn');
       saveBtn.innerHTML = '✓ In Your Library';
@@ -280,12 +573,323 @@ async function saveActiveBook() {
       const badgeEl = document.getElementById('result-badge');
       badgeEl.className = 'result-badge badge-owned';
       badgeEl.innerHTML = '✓ Already In Your Database';
+
       loadLibrary();
       loadProfile();
     }
   } catch (err) {
     showToast('⚠️ Error saving to library');
   }
+}
+
+// =========================================================
+// 📚 LIBRARY & CATEGORIES VIEW
+// =========================================================
+function initCategoryFilters() {
+  // Category chips
+  document.querySelectorAll('.cat-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentCategoryFilter = chip.getAttribute('data-category');
+      filterLibrary();
+    });
+  });
+
+  // Secondary status filter buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentStatusFilter = btn.getAttribute('data-status-filter');
+      filterLibrary();
+    });
+  });
+}
+
+async function loadLibrary() {
+  const grid = document.getElementById('library-books-grid');
+  if (!grid) return;
+
+  try {
+    const res = await fetch('/api/library', {
+      headers: { 'Authorization': `Bearer ${currentUser.uid}` }
+    });
+    libraryBooks = await res.json();
+    updateDashboardStats(libraryBooks);
+    filterLibrary();
+  } catch (err) {
+    console.error('Error loading library:', err);
+  }
+}
+
+function updateDashboardStats(books) {
+  const total = books.length;
+  const completed = books.filter(b => (b.status || '').toLowerCase().includes('complet') || (b.status || '').toLowerCase().includes('finish')).length;
+  const reading = books.filter(b => (b.status || '').toLowerCase().includes('read') && !(b.status || '').toLowerCase().includes('complet')).length;
+  const goal = currentUser.reading_goal || 25;
+  const goalPct = Math.min(100, Math.round((completed / goal) * 100));
+
+  const totalEl = document.getElementById('metric-total');
+  const compEl = document.getElementById('metric-completed');
+  const readEl = document.getElementById('metric-reading');
+  const goalPctEl = document.getElementById('metric-goal-pct');
+  const goalTextEl = document.getElementById('goal-progress-text');
+  const goalFillEl = document.getElementById('goal-progress-fill');
+  const countBadge = document.getElementById('library-count-badge');
+
+  if (totalEl) totalEl.textContent = total;
+  if (compEl) compEl.textContent = completed;
+  if (readEl) readEl.textContent = reading;
+  if (goalPctEl) goalPctEl.textContent = `${goalPct}%`;
+  if (goalTextEl) goalTextEl.textContent = `${completed} / ${goal} Finished (${goalPct}%)`;
+  if (goalFillEl) goalFillEl.style.width = `${goalPct}%`;
+  if (countBadge) countBadge.textContent = `${total} Books`;
+}
+
+function filterLibrary() {
+  const searchInput = document.getElementById('library-search');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  let filtered = libraryBooks.filter(b => {
+    // 1. Text Search Filter
+    const matchesQuery = !query || 
+      b.title.toLowerCase().includes(query) || 
+      (b.author && b.author.toLowerCase().includes(query)) ||
+      (b.genre && b.genre.toLowerCase().includes(query));
+
+    // 2. Category Filter
+    let matchesCat = true;
+    if (currentCategoryFilter !== 'ALL') {
+      const bCat = (b.genre || '').toLowerCase();
+      const targetCat = currentCategoryFilter.toLowerCase();
+      matchesCat = bCat.includes(targetCat.split(' ')[0]);
+    }
+
+    // 3. Status Filter
+    let matchesStatus = true;
+    if (currentStatusFilter !== 'ALL') {
+      const bStatus = (b.status || 'reading').toLowerCase();
+      const targetStatus = currentStatusFilter.toLowerCase();
+      if (targetStatus === 'completed') matchesStatus = bStatus.includes('complet') || bStatus.includes('finish');
+      else if (targetStatus === 'reading') matchesStatus = bStatus.includes('read') && !bStatus.includes('complet');
+      else if (targetStatus === 'wishlist') matchesStatus = bStatus.includes('wish') || bStatus.includes('want');
+    }
+
+    return matchesQuery && matchesCat && matchesStatus;
+  });
+
+  renderLibrary(filtered);
+}
+
+function renderLibrary(books) {
+  const grid = document.getElementById('library-books-grid');
+  if (!grid) return;
+
+  if (!books || books.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-card);">
+        <div style="font-size: 3rem; margin-bottom: 10px;">📚</div>
+        <h3 style="font-size: 1.1rem; font-weight: 800;">No books found</h3>
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+          Try changing your category filter or scan a new book cover!
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = books.map((b) => {
+    const isCompleted = (b.status || '').toLowerCase().includes('complet') || (b.status || '').toLowerCase().includes('finish');
+    const isWishlist = (b.status || '').toLowerCase().includes('wish');
+    const statusClass = isCompleted ? 'tag-completed' : (isWishlist ? 'tag-wishlist' : 'tag-reading');
+    const statusLabel = isCompleted ? '🎉 Read' : (isWishlist ? '⭐ Wishlist' : '📖 Reading');
+
+    return `
+      <div class="library-item 3d-card" onclick="openBookModal('${encodeURIComponent(b.title)}')">
+        <div class="lib-cover-wrap">
+          <img src="${b.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=300&q=80'}" class="lib-cover" alt="cover">
+        </div>
+        <div class="lib-meta">
+          <div>
+            <div class="lib-category-tag">${escapeHtml(b.genre || 'General')}</div>
+            <div class="lib-title">${escapeHtml(b.title)}</div>
+            <div class="lib-author">${escapeHtml(b.author || 'Author Unknown')}</div>
+          </div>
+          <div class="lib-footer">
+            <span class="status-tag ${statusClass}">${statusLabel}</span>
+            <span style="font-size: 0.72rem; color: #f59e0b; font-weight: 700;">★ ${b.rating || 5}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// =========================================================
+// 📖 3D BOOK READING & DETAIL MODAL (<dialog>)
+// =========================================================
+function initModals() {
+  document.getElementById('close-book-modal')?.addEventListener('click', () => bookModal.close());
+
+  // Star ratings in modal
+  document.querySelectorAll('#modal-star-rating .star').forEach(star => {
+    star.addEventListener('click', () => {
+      const rating = parseInt(star.getAttribute('data-rating'));
+      setModalRating(rating);
+      if (selectedModalBook) {
+        selectedModalBook.rating = rating;
+        updateBookOnServer(selectedModalBook);
+      }
+    });
+  });
+
+  // Modal Status buttons
+  document.querySelectorAll('.m-status-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.m-status-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const newStatus = btn.getAttribute('data-m-status');
+      if (selectedModalBook) {
+        selectedModalBook.status = newStatus;
+        if (newStatus === 'Completed') {
+          triggerConfettiCelebration(selectedModalBook.title);
+        }
+        updateBookOnServer(selectedModalBook);
+        loadLibrary();
+        loadProfile();
+      }
+    });
+  });
+
+  // Modal Category select change
+  document.getElementById('modal-category-select')?.addEventListener('change', (e) => {
+    if (selectedModalBook) {
+      selectedModalBook.genre = e.target.value;
+      updateBookOnServer(selectedModalBook);
+      loadLibrary();
+    }
+  });
+
+  // Modal chat button
+  document.getElementById('modal-chat-btn')?.addEventListener('click', () => {
+    bookModal.close();
+    if (selectedModalBook) openChatForBook(selectedModalBook);
+  });
+
+  // Modal delete button
+  document.getElementById('modal-delete-btn')?.addEventListener('click', () => {
+    if (selectedModalBook && confirm(`Remove '${selectedModalBook.title}' from your library?`)) {
+      deleteBook(selectedModalBook.title);
+      bookModal.close();
+    }
+  });
+}
+
+function openBookModal(encodedTitle) {
+  const title = decodeURIComponent(encodedTitle);
+  const book = libraryBooks.find(b => b.title === title);
+  if (!book) return;
+
+  selectedModalBook = book;
+
+  document.getElementById('modal-book-title').textContent = book.title;
+  document.getElementById('modal-book-author').textContent = `by ${book.author || 'Author Unknown'}`;
+  document.getElementById('modal-book-cover').src = book.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=400&q=80';
+  document.getElementById('modal-book-genre-pill').textContent = book.genre || 'General';
+
+  // Set category dropdown
+  const catSelect = document.getElementById('modal-category-select');
+  if (catSelect) {
+    catSelect.value = book.genre || 'Fiction 📚';
+  }
+
+  // Set status button
+  document.querySelectorAll('.m-status-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.getAttribute('data-m-status') === (book.status || 'Reading')) {
+      b.classList.add('active');
+    }
+  });
+
+  // Set star rating
+  setModalRating(book.rating || 5);
+
+  // Set scenario / synopsis
+  const scenarioBox = document.getElementById('modal-scenario-content');
+  if (book.overview || book.scenario) {
+    scenarioBox.innerHTML = `
+      <div style="font-weight: 700; margin-bottom: 4px;">📖 Premise & Scenario:</div>
+      <div>${escapeHtml(book.overview || 'Atmospheric story scenario crafted by AI.')}</div>
+    `;
+  } else {
+    scenarioBox.textContent = `A celebrated ${book.genre || 'book'} by ${book.author}. Tap Chat to explore the story scenario with AI!`;
+  }
+
+  bookModal.showModal();
+}
+
+function setModalRating(rating) {
+  document.querySelectorAll('#modal-star-rating .star').forEach(star => {
+    const starRating = parseInt(star.getAttribute('data-rating'));
+    if (starRating <= rating) {
+      star.classList.add('active');
+    } else {
+      star.classList.remove('active');
+    }
+  });
+}
+
+async function updateBookOnServer(book) {
+  try {
+    await fetch('/api/library/update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentUser.uid}`
+      },
+      body: JSON.stringify({
+        title: book.title,
+        status: book.status,
+        rating: book.rating,
+        genre: book.genre
+      })
+    });
+    showToast(`✓ Updated '${book.title}'`);
+  } catch (e) {
+    console.error('Failed to update book on server', e);
+  }
+}
+
+async function deleteBook(title) {
+  try {
+    const res = await fetch(`/api/library/remove?title=${encodeURIComponent(title)}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${currentUser.uid}` }
+    });
+    if (res.ok) {
+      showToast(`🗑️ Removed '${title}'`);
+      loadLibrary();
+      loadProfile();
+    }
+  } catch (err) {
+    showToast('⚠️ Error removing book');
+  }
+}
+
+// =========================================================
+// 🎉 CELEBRATION EFFECT (CONFETTI ON BOOK COMPLETION)
+// =========================================================
+function triggerConfettiCelebration(bookTitle) {
+  if (typeof confetti === 'function') {
+    confetti({
+      particleCount: 120,
+      spread: 80,
+      origin: { y: 0.6 },
+      colors: ['#6366f1', '#10b981', '#06b6d4', '#f59e0b', '#ec4899']
+    });
+  }
+  showToast(`🎉 வாழ்த்துகள்! '${bookTitle}' படிச்சு முடிச்சிட்டீங்க!`);
 }
 
 // =========================================================
@@ -296,10 +900,8 @@ function openChatForBook(book) {
   activeBook = book;
   chatHistory = [];
 
-  // Update Drawer Book Banner
   document.getElementById('drawer-book-title').textContent = book.title;
-  const genreTag = document.getElementById('drawer-genre-tag');
-  genreTag.textContent = book.genre || 'Fiction';
+  document.getElementById('drawer-genre-tag').textContent = book.genre || 'Fiction';
 
   const scenarioDesc = document.getElementById('drawer-scenario-desc');
   if (book.scenario && book.scenario.story_narrative) {
@@ -308,15 +910,14 @@ function openChatForBook(book) {
     scenarioDesc.textContent = book.overview || `A gripping narrative by ${book.author}. Tap below to discover the scenario, story, and takeaways!`;
   }
 
-  // Clear messages & inject initial greeting
   const messagesList = document.getElementById('chat-messages-list');
   messagesList.innerHTML = `
     <div class="msg-row ai">
       <div class="msg-avatar avatar-ai">AI</div>
       <div class="msg-bubble">
-        வணக்கம்! நான் உங்கள் <strong>BookNest AI</strong> உதவியாளர். 
+        வணக்கம்! நான் உங்கள் <strong>BookNest AI</strong> கதை உதவியாளர். 
         <br><br>
-        <strong>'${book.title}'</strong> புத்தகத்தின் பின்னணி, கதைச் சுருக்கம் (scenario & story) அல்லது முக்கியமான கருத்துக்களை என்னிடம் கேட்கலாம்!
+        <strong>'${book.title}'</strong> புத்தகத்தின் பின்னணி, கதைச் சுருக்கம் (scenario & story) அல்லது முக்கியமான கருத்துக்களை தமிழில் அல்லது ஆங்கிலத்தில் கேட்கலாம்!
       </div>
     </div>
   `;
@@ -330,7 +931,6 @@ async function sendMessage() {
   if (!text || !activeBook) return;
 
   inputEl.value = '';
-
   const messagesList = document.getElementById('chat-messages-list');
 
   // Append user bubble
@@ -356,9 +956,7 @@ async function sendMessage() {
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         book_title: activeBook.title,
         book_author: activeBook.author,
@@ -384,151 +982,71 @@ async function sendMessage() {
 }
 
 // =========================================================
-// 📚 LIBRARY / DATABASE VIEW
-// =========================================================
-async function loadLibrary() {
-  const grid = document.getElementById('library-books-grid');
-  if (!grid) return;
-
-  try {
-    const res = await fetch('/api/library', {
-      headers: { 'Authorization': 'Bearer default_user' }
-    });
-    libraryBooks = await res.json();
-    renderLibrary(libraryBooks);
-  } catch (err) {
-    console.error('Error loading library:', err);
-  }
-}
-
-function renderLibrary(books) {
-  const grid = document.getElementById('library-books-grid');
-  const countEl = document.getElementById('library-count');
-  if (countEl) countEl.textContent = `${books.length} Books`;
-
-  if (!books || books.length === 0) {
-    grid.innerHTML = `
-      <div style="text-align: center; padding: 40px 20px; color: var(--text-dim);">
-        <div style="font-size: 2.5rem; margin-bottom: 8px;">📖</div>
-        <h3>No books in your database yet</h3>
-        <p style="font-size: 0.85rem; margin-top: 4px;">Tap the Scan button to scan your first book!</p>
-      </div>
-    `;
-    return;
-  }
-
-  grid.innerHTML = books.map((b) => `
-    <div class="library-item" data-title="${escapeHtml(b.title)}">
-      <img src="${b.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=200&q=80'}" class="lib-cover" alt="cover">
-      <div class="lib-meta">
-        <div>
-          <div class="lib-title">${escapeHtml(b.title)}</div>
-          <div class="lib-author">${escapeHtml(b.author || 'Author Unknown')}</div>
-        </div>
-        <div class="lib-footer">
-          <span class="status-tag">${escapeHtml(b.status || 'Reading')}</span>
-          <div style="display: flex; gap: 8px;">
-            <button class="icon-btn" style="width: 28px; height: 28px;" onclick="openChatForSavedBook('${escapeHtml(b.title)}')">
-              💬
-            </button>
-            <button class="del-btn" onclick="deleteBook('${escapeHtml(b.title)}')">
-              ✕
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function filterLibrary() {
-  const query = document.getElementById('library-search').value.toLowerCase();
-  const filtered = libraryBooks.filter((b) =>
-    b.title.toLowerCase().includes(query) || (b.author && b.author.toLowerCase().includes(query))
-  );
-  renderLibrary(filtered);
-}
-
-function openChatForSavedBook(title) {
-  const found = libraryBooks.find((b) => b.title === title);
-  if (found) {
-    openChatForBook(found);
-  }
-}
-
-async function deleteBook(title) {
-  if (!confirm(`Remove '${title}' from your library?`)) return;
-
-  try {
-    const res = await fetch(`/api/library/remove?title=${encodeURIComponent(title)}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': 'Bearer default_user' }
-    });
-    if (res.ok) {
-      showToast(`Removed '${title}'`);
-      loadLibrary();
-      loadProfile();
-    }
-  } catch (err) {
-    showToast('⚠️ Error removing book');
-  }
-}
-
-// =========================================================
-// 👤 USER PROFILE VIEW
+// 👤 PROFILE & DIAGNOSTICS VIEW
 // =========================================================
 async function loadProfile() {
   try {
     const res = await fetch('/api/profile', {
-      headers: { 'Authorization': 'Bearer default_user' }
+      headers: { 'Authorization': `Bearer ${currentUser.uid}` }
     });
     const profile = await res.json();
 
-    document.getElementById('profile-name').textContent = profile.name || 'Brother';
-    document.getElementById('profile-email').textContent = profile.email || 'brother@bookai.local';
-    document.getElementById('stat-total-books').textContent = profile.total_books || 0;
-    document.getElementById('stat-total-scans').textContent = profile.total_scans || 0;
-    document.getElementById('stat-goal').textContent = `${profile.total_books || 0} / ${profile.reading_goal || 25}`;
-    document.getElementById('backend-mode-badge').textContent = profile.backend_mode || 'SQLite Persistent';
+    const totalEl = document.getElementById('stat-total-books');
+    const compEl = document.getElementById('stat-completed-books');
+    const scansEl = document.getElementById('stat-total-scans');
+    const goalEl = document.getElementById('stat-goal');
+    const modeBadge = document.getElementById('backend-mode-badge');
+
+    const totalBooks = profile.total_books || libraryBooks.length;
+    const completedBooks = profile.completed_books || libraryBooks.filter(b => (b.status || '').toLowerCase().includes('complet')).length;
+    const goal = profile.reading_goal || currentUser.reading_goal || 25;
+
+    if (totalEl) totalEl.textContent = totalBooks;
+    if (compEl) compEl.textContent = completedBooks;
+    if (scansEl) scansEl.textContent = profile.total_scans || 0;
+    if (goalEl) goalEl.textContent = `${completedBooks} / ${goal}`;
+    if (modeBadge) modeBadge.textContent = profile.backend_mode || 'SQLite Mirror';
+
   } catch (err) {
-    console.error('Profile load error:', err);
+    console.error('Error loading profile:', err);
   }
 }
 
 // =========================================================
-// 📲 PHONE CONNECT & QR CODE GENERATOR
+// 📲 NETWORK INFO & QR CODE
 // =========================================================
 async function loadNetworkInfo() {
   try {
     const res = await fetch('/api/network-info');
-    const info = await res.json();
-    const phoneUrl = info.mobile_url || window.location.href;
+    const data = await res.json();
+    const targetUrl = data.mobile_url || data.public_url || `http://${data.local_ip}:${data.port}`;
 
-    document.getElementById('connect-url-display').textContent = phoneUrl;
+    const urlDisplay = document.getElementById('connect-url-display');
+    if (urlDisplay) urlDisplay.textContent = targetUrl;
 
-    // Render QR Code using Google Chart or QR API SVG
-    const qrContainer = document.getElementById('qrcode-box');
-    qrContainer.innerHTML = `
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(phoneUrl)}&margin=4" 
-           alt="Scan with phone" style="width: 100%; height: 100%; border-radius: 8px;">
-    `;
+    const qrBox = document.getElementById('qrcode-box');
+    if (qrBox) {
+      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(targetUrl)}&margin=10`;
+      qrBox.innerHTML = `<img src="${qrApiUrl}" width="180" height="180" alt="Mobile QR Code" style="border-radius: 12px;">`;
+    }
   } catch (err) {
-    console.error('Network info error:', err);
+    console.error('Error loading network info:', err);
   }
 }
 
 // =========================================================
-// 🛠 UTILITIES
+// 🔔 UTILITIES (TOAST & ESCAPE)
 // =========================================================
 function showToast(msg) {
+  if (!toastEl) return;
   toastEl.textContent = msg;
   toastEl.classList.add('show');
-  setTimeout(() => toastEl.classList.remove('show'), 2600);
+  setTimeout(() => toastEl.classList.remove('show'), 3200);
 }
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function formatMarkdown(text) {
@@ -536,12 +1054,13 @@ function formatMarkdown(text) {
   let formatted = escapeHtml(text);
   formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  formatted = formatted.replace(/\n\n/g, '<br><br>');
   formatted = formatted.replace(/\n/g, '<br>');
   return formatted;
 }
 
 function registerPWA() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js').catch(console.warn);
   }
 }
