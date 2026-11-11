@@ -1371,21 +1371,127 @@ function dismissAiSpeechBubble() {
 }
 
 function initAiBot() {
-  const fab = document.getElementById('floating-ai-bot');
-  if (fab) {
-    fab.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      openGeneralAiBot();
-    });
-    fab.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      openGeneralAiBot();
-    });
+  const wrapper = document.getElementById('ai-bot-wrapper');
+  const botBtn = document.getElementById('floating-ai-bot');
+  const bubble = document.getElementById('ai-bot-speech-bubble');
+
+  // Restore saved position if available
+  const savedPos = localStorage.getItem('booknest_ai_bot_pos');
+  if (savedPos && wrapper) {
+    try {
+      const { left, top } = JSON.parse(savedPos);
+      const maxX = Math.max(10, window.innerWidth - 80);
+      const maxY = Math.max(70, window.innerHeight - 80);
+      const clampedX = Math.max(10, Math.min(maxX, left));
+      const clampedY = Math.max(68, Math.min(maxY, top));
+      wrapper.style.left = `${clampedX}px`;
+      wrapper.style.top = `${clampedY}px`;
+      wrapper.style.right = 'auto';
+      wrapper.style.bottom = 'auto';
+      if (clampedX < window.innerWidth * 0.4) {
+        wrapper.classList.add('docked-left');
+      }
+    } catch (e) {
+      console.warn('Could not restore AI bot position');
+    }
   }
 
-  const bubble = document.getElementById('ai-bot-speech-bubble');
+  // Movable / Draggable AI Bot
+  if (wrapper && botBtn) {
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let initialLeft = 0, initialTop = 0;
+    let hasMoved = false;
+    const dragThreshold = 6;
+
+    function onPointerDown(e) {
+      const pointer = e.touches ? e.touches[0] : e;
+      startX = pointer.clientX;
+      startY = pointer.clientY;
+
+      const rect = wrapper.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      hasMoved = false;
+      isDragging = true;
+
+      wrapper.style.left = `${initialLeft}px`;
+      wrapper.style.top = `${initialTop}px`;
+      wrapper.style.right = 'auto';
+      wrapper.style.bottom = 'auto';
+      wrapper.style.transition = 'none';
+
+      document.addEventListener('mousemove', onPointerMove, { passive: false });
+      document.addEventListener('mouseup', onPointerUp);
+      document.addEventListener('touchmove', onPointerMove, { passive: false });
+      document.addEventListener('touchend', onPointerUp);
+    }
+
+    function onPointerMove(e) {
+      if (!isDragging) return;
+      const pointer = e.touches ? e.touches[0] : e;
+      const dx = pointer.clientX - startX;
+      const dy = pointer.clientY - startY;
+
+      if (!hasMoved && Math.hypot(dx, dy) > dragThreshold) {
+        hasMoved = true;
+        botBtn.classList.add('dragging');
+        if (bubble) bubble.style.opacity = '0';
+      }
+
+      if (hasMoved) {
+        if (e.cancelable) e.preventDefault();
+        const newX = initialLeft + dx;
+        const newY = initialTop + dy;
+
+        const maxX = Math.max(10, window.innerWidth - wrapper.offsetWidth - 10);
+        const maxY = Math.max(70, window.innerHeight - wrapper.offsetHeight - 72);
+
+        const clampedX = Math.max(10, Math.min(maxX, newX));
+        const clampedY = Math.max(68, Math.min(maxY, newY));
+
+        wrapper.style.left = `${clampedX}px`;
+        wrapper.style.top = `${clampedY}px`;
+      }
+    }
+
+    function onPointerUp(e) {
+      if (!isDragging) return;
+      isDragging = false;
+      botBtn.classList.remove('dragging');
+
+      document.removeEventListener('mousemove', onPointerMove);
+      document.removeEventListener('mouseup', onPointerUp);
+      document.removeEventListener('touchmove', onPointerMove);
+      document.removeEventListener('touchend', onPointerUp);
+
+      if (hasMoved) {
+        const rect = wrapper.getBoundingClientRect();
+        localStorage.setItem('booknest_ai_bot_pos', JSON.stringify({
+          left: rect.left,
+          top: rect.top
+        }));
+
+        if (rect.left < window.innerWidth * 0.4) {
+          wrapper.classList.add('docked-left');
+        } else {
+          wrapper.classList.remove('docked-left');
+        }
+
+        if (bubble) {
+          setTimeout(() => {
+            bubble.style.opacity = '1';
+          }, 150);
+        }
+      } else {
+        openGeneralAiBot();
+      }
+    }
+
+    botBtn.addEventListener('mousedown', onPointerDown);
+    botBtn.addEventListener('touchstart', onPointerDown, { passive: true });
+  }
+
   if (bubble) {
     bubble.addEventListener('click', (e) => {
       if (e.target.id === 'close-speech-bubble') return;
@@ -1941,9 +2047,6 @@ function initTimerEvents() {
   document.getElementById('timer-book-select')?.addEventListener('change', (e) => {
     onTimerBookSelected(e.target.value);
   });
-
-  // Floating AI Bot FAB Click
-  document.getElementById('floating-ai-bot')?.addEventListener('click', openGeneralAiBot);
 
   // Reading Goal Stepper Buttons in Profile
   document.getElementById('goal-minus-btn')?.addEventListener('click', () => {

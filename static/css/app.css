@@ -3374,12 +3374,22 @@ dialog::backdrop {
   flex-direction: column;
   align-items: flex-end;
   pointer-events: none;
+  touch-action: none;
 }
 
 @media (max-width: 480px) {
   .floating-ai-wrapper {
     right: 16px;
   }
+}
+
+.floating-ai-wrapper.docked-left {
+  align-items: flex-start;
+}
+
+.floating-ai-wrapper.docked-left .speech-bubble-arrow {
+  right: auto;
+  left: 24px;
 }
 
 /* Floating Conversational Speech Bubble */
@@ -3480,7 +3490,7 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: grab;
   outline: none;
   padding: 0;
   animation: fabFloatBob 3.5s ease-in-out infinite;
@@ -3489,7 +3499,7 @@ dialog::backdrop {
   -webkit-backdrop-filter: none !important;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  touch-action: none;
   filter: drop-shadow(0 6px 14px rgba(99, 102, 241, 0.45));
 }
 
@@ -3498,10 +3508,18 @@ dialog::backdrop {
 }
 
 .floating-ai-fab:active {
-  transform: scale(0.9) !important;
+  transform: scale(0.92) !important;
+  cursor: grabbing;
 }
 
-.floating-ai-fab:hover {
+.floating-ai-fab.dragging {
+  cursor: grabbing !important;
+  animation: none !important;
+  transform: scale(1.15) !important;
+  filter: drop-shadow(0 12px 26px rgba(99, 102, 241, 0.75)) !important;
+}
+
+.floating-ai-fab:hover:not(.dragging) {
   transform: translateY(-4px) scale(1.08);
   filter: drop-shadow(0 10px 22px rgba(99, 102, 241, 0.65));
 }
