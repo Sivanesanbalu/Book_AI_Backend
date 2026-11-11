@@ -60,10 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (uploadBtn) uploadBtn.addEventListener('click', () => photoInput.click());
   if (photoInput) photoInput.addEventListener('change', handleFileSelected);
 
-  // Switch camera (both bottom and top buttons)
+  // Switch camera (single clean flip button)
   if (switchCamBtn) switchCamBtn.addEventListener('click', toggleCamera);
-  const topFlipBtn = document.getElementById('top-flip-cam-btn');
-  if (topFlipBtn) topFlipBtn.addEventListener('click', toggleCamera);
 
   // Flash / Torch toggle
   const flashToggleBtn = document.getElementById('flash-toggle-btn');
