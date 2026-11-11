@@ -72,10 +72,37 @@ def init_local_db():
                 status TEXT DEFAULT 'Reading',
                 rating INTEGER DEFAULT 5,
                 notes TEXT DEFAULT '',
+                current_page INTEGER DEFAULT 0,
+                total_pages INTEGER DEFAULT 300,
+                reading_minutes INTEGER DEFAULT 0,
+                last_read TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (uid, book_id)
             )
             """)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS reading_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uid TEXT,
+                book_id TEXT,
+                title TEXT,
+                minutes INTEGER,
+                pages_read INTEGER DEFAULT 0,
+                start_page INTEGER DEFAULT 0,
+                end_page INTEGER DEFAULT 0,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+            # Auto-migrate columns if missing in user_books
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(user_books)").fetchall()]
+            if 'current_page' not in cols:
+                conn.execute("ALTER TABLE user_books ADD COLUMN current_page INTEGER DEFAULT 0")
+            if 'total_pages' not in cols:
+                conn.execute("ALTER TABLE user_books ADD COLUMN total_pages INTEGER DEFAULT 300")
+            if 'reading_minutes' not in cols:
+                conn.execute("ALTER TABLE user_books ADD COLUMN reading_minutes INTEGER DEFAULT 0")
+            if 'last_read' not in cols:
+                conn.execute("ALTER TABLE user_books ADD COLUMN last_read TIMESTAMP")
             conn.execute("""
             CREATE TABLE IF NOT EXISTS scan_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,7 +195,8 @@ def user_has_book(uid: str, title: str) -> bool:
 # ---------------- SAVE BOOK FOR USER ----------------
 def save_book_for_user(uid: str, title: str, author: str = "", genre: str = "General",
                        cover_url: str = "", overview: str = "", confidence: float = 1.0,
-                       status: str = "Reading", rating: int = 5, notes: str = ""):
+                       status: str = "Reading", rating: int = 5, notes: str = "",
+                       current_page: int = 0, total_pages: int = 300, reading_minutes: int = 0):
     b_id = book_id(title)
 
     if use_firestore and db:
@@ -184,6 +212,9 @@ def save_book_for_user(uid: str, title: str, author: str = "", genre: str = "Gen
                 "status": status,
                 "rating": rating,
                 "notes": notes,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "reading_minutes": reading_minutes,
                 "normalized": normalize_title(title),
                 "createdAt": firestore.SERVER_TIMESTAMP if firestore else time.time()
             }, merge=True)
@@ -195,8 +226,8 @@ def save_book_for_user(uid: str, title: str, author: str = "", genre: str = "Gen
     with _db_lock:
         with get_sqlite_conn() as conn:
             conn.execute("""
-            INSERT INTO user_books (uid, book_id, title, author, genre, cover_url, overview, confidence, status, rating, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO user_books (uid, book_id, title, author, genre, cover_url, overview, confidence, status, rating, notes, current_page, total_pages, reading_minutes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(uid, book_id) DO UPDATE SET
                 title = excluded.title,
                 author = COALESCE(NULLIF(excluded.author, ''), user_books.author),
@@ -204,8 +235,11 @@ def save_book_for_user(uid: str, title: str, author: str = "", genre: str = "Gen
                 cover_url = COALESCE(NULLIF(excluded.cover_url, ''), user_books.cover_url),
                 overview = COALESCE(NULLIF(excluded.overview, ''), user_books.overview),
                 status = excluded.status,
-                rating = excluded.rating
-            """, (uid, b_id, title, author, genre, cover_url, overview, confidence, status, rating, notes))
+                rating = excluded.rating,
+                current_page = CASE WHEN excluded.current_page > 0 THEN excluded.current_page ELSE user_books.current_page END,
+                total_pages = CASE WHEN excluded.total_pages > 0 THEN excluded.total_pages ELSE user_books.total_pages END,
+                reading_minutes = user_books.reading_minutes + excluded.reading_minutes
+            """, (uid, b_id, title, author, genre, cover_url, overview, confidence, status, rating, notes, current_page, total_pages, reading_minutes))
             conn.commit()
 
     print(f"📘 Saved book: '{title}' for user: {uid}")
@@ -217,10 +251,10 @@ def get_user_books(uid: str):
     with _db_lock:
         with get_sqlite_conn() as conn:
             rows = conn.execute("""
-            SELECT book_id, title, author, genre, cover_url, overview, confidence, status, rating, notes, created_at
+            SELECT book_id, title, author, genre, cover_url, overview, confidence, status, rating, notes, current_page, total_pages, reading_minutes, last_read, created_at
             FROM user_books
             WHERE uid = ?
-            ORDER BY created_at DESC
+            ORDER BY datetime(last_read) DESC, created_at DESC
             """, (uid,)).fetchall()
             return [dict(r) for r in rows]
 
@@ -325,11 +359,12 @@ def update_user_profile(uid: str, name: str = None, email: str = None, reading_g
     return get_user_profile(uid)
 
 
-def update_book_status(uid: str, title: str, status: str = None, rating: int = None, genre: str = None):
+def update_book_status(uid: str, title: str, status: str = None, rating: int = None, genre: str = None,
+                       current_page: int = None, total_pages: int = None, add_minutes: int = 0):
     b_id = book_id(title)
     with _db_lock:
         with get_sqlite_conn() as conn:
-            updates = []
+            updates = ["last_read = CURRENT_TIMESTAMP"]
             params = []
             if status is not None:
                 updates.append("status = ?")
@@ -340,13 +375,35 @@ def update_book_status(uid: str, title: str, status: str = None, rating: int = N
             if genre is not None:
                 updates.append("genre = ?")
                 params.append(genre)
+            if current_page is not None:
+                updates.append("current_page = ?")
+                params.append(current_page)
+            if total_pages is not None:
+                updates.append("total_pages = ?")
+                params.append(total_pages)
+            if add_minutes > 0:
+                updates.append("reading_minutes = reading_minutes + ?")
+                params.append(add_minutes)
 
-            if updates:
-                params.extend([uid, b_id])
-                sql = f"UPDATE user_books SET {', '.join(updates)} WHERE uid = ? AND book_id = ?"
-                conn.execute(sql, params)
-                conn.commit()
+            params.extend([uid, b_id])
+            sql = f"UPDATE user_books SET {', '.join(updates)} WHERE uid = ? AND book_id = ?"
+            conn.execute(sql, params)
+            conn.commit()
     return True
+
+
+def log_reading_session(uid: str, title: str, minutes: int, start_page: int = 0, end_page: int = 0):
+    b_id = book_id(title)
+    pages_read = max(0, end_page - start_page) if end_page > start_page else 0
+    with _db_lock:
+        with get_sqlite_conn() as conn:
+            conn.execute("""
+            INSERT INTO reading_sessions (uid, book_id, title, minutes, pages_read, start_page, end_page)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (uid, b_id, title, minutes, pages_read, start_page, end_page))
+            conn.commit()
+    update_book_status(uid, title, current_page=end_page if end_page > 0 else None, add_minutes=minutes)
+    return {"status": "logged", "minutes": minutes, "pages_read": pages_read}
 
 
 def upsert_google_user(uid: str, name: str, email: str, avatar: str = None):

@@ -35,11 +35,6 @@
       </div>
 
       <div class="header-actions">
-        <!-- Theme Toggle (Light / Dark) -->
-        <button id="theme-toggle-btn" class="icon-btn" title="Toggle Clean White / Dark Mode">
-          <span id="theme-icon">🌙</span>
-        </button>
-
         <!-- Google User Profile Pill -->
         <button id="auth-header-btn" class="user-pill-btn" title="Google Account & Profile">
           <img id="header-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="header-avatar" alt="Avatar">
@@ -49,9 +44,147 @@
     </header>
 
     <!-- ==========================================
+         TAB 0: DASHBOARD / HOME OVERVIEW (FIRST OPTION)
+         ========================================== -->
+    <section id="tab-dashboard" class="tab-content active">
+      
+      <!-- Welcome Hero Header -->
+      <div class="dash-hero-card 3d-card">
+        <div class="dash-hero-left">
+          <div class="streak-badge">
+            <span class="streak-fire">🔥</span>
+            <span id="dash-streak-text">1 Day Streak</span>
+          </div>
+          <h1 class="dash-greeting" id="dash-greeting-text">Welcome back, Reader!</h1>
+          <p class="dash-motto" id="dash-daily-quote">"A reader lives a thousand lives before he dies."</p>
+        </div>
+        <div class="dash-hero-avatar-wrap">
+          <img id="dash-hero-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80" class="dash-hero-avatar" alt="User">
+        </div>
+      </div>
+
+      <!-- Daily Reading Motivational Reminder Card -->
+      <div class="daily-reminder-card 3d-card">
+        <div class="reminder-icon-box">📖</div>
+        <div class="reminder-content">
+          <div class="reminder-tag">DAILY READING HABIT</div>
+          <div class="reminder-message" id="daily-reminder-msg">
+            Spend 15 minutes today with your books! Pick up right where you left off.
+          </div>
+        </div>
+        <button id="quick-start-reminder-btn" class="reminder-action-btn" title="Start Reading Session">
+          Start ⏱️
+        </button>
+      </div>
+
+      <!-- Quick Metrics Grid (3D Porcelain Cards) -->
+      <div class="dash-metrics-grid">
+        <div class="dash-metric-card 3d-card">
+          <div class="dm-icon dm-books">📚</div>
+          <div class="dm-val" id="dash-total-books">0</div>
+          <div class="dm-label">In Library</div>
+        </div>
+        <div class="dash-metric-card 3d-card">
+          <div class="dm-icon dm-reading">📖</div>
+          <div class="dm-val" id="dash-reading-books">0</div>
+          <div class="dm-label">Reading Now</div>
+        </div>
+        <div class="dash-metric-card 3d-card">
+          <div class="dm-icon dm-completed">🎉</div>
+          <div class="dm-val" id="dash-completed-books">0</div>
+          <div class="dm-label">Completed</div>
+        </div>
+        <div class="dash-metric-card 3d-card">
+          <div class="dm-icon dm-time">⏱️</div>
+          <div class="dm-val" id="dash-reading-mins">0m</div>
+          <div class="dm-label">Time Read</div>
+        </div>
+      </div>
+
+      <!-- 2026 Goal Card -->
+      <div class="dash-goal-card 3d-card">
+        <div class="d-goal-top">
+          <div style="font-weight: 800; font-size: 0.95rem;">2026 Reading Goal</div>
+          <div id="dash-goal-pct" class="d-goal-badge">0%</div>
+        </div>
+        <div class="d-goal-track">
+          <div id="dash-goal-fill" class="d-goal-fill" style="width: 0%;"></div>
+        </div>
+        <div class="d-goal-sub" id="dash-goal-sub">0 of 25 Books Completed</div>
+      </div>
+
+      <!-- Currently Reading Highlight Card -->
+      <div class="currently-reading-box 3d-card" id="current-reading-shelf">
+        <div class="shelf-header">
+          <div class="shelf-title">📖 Continue Reading</div>
+          <button id="see-all-reading-btn" class="text-link-btn">View All</button>
+        </div>
+
+        <div id="active-reading-card" class="active-reading-inner">
+          <div class="ar-cover-wrap">
+            <img id="ar-cover" src="https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=200&q=80" class="ar-cover" alt="Cover">
+          </div>
+          <div class="ar-details">
+            <span class="ar-genre-tag" id="ar-genre">Self-Help</span>
+            <h3 class="ar-title" id="ar-title">Atomic Habits</h3>
+            <div class="ar-author" id="ar-author">by James Clear</div>
+            
+            <div class="ar-progress-wrap">
+              <div class="ar-progress-labels">
+                <span id="ar-page-text">Page 0 of 320</span>
+                <span id="ar-progress-pct">0%</span>
+              </div>
+              <div class="ar-track">
+                <div id="ar-fill" class="ar-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="ar-actions">
+              <button id="ar-open-timer-btn" class="ar-btn-primary">
+                ⏱️ Start Timer
+              </button>
+              <button id="ar-update-page-btn" class="ar-btn-secondary">
+                🔖 Bookmark
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="no-reading-placeholder" class="no-reading-state" style="display: none;">
+          <div style="font-size: 2rem; margin-bottom: 8px;">📚</div>
+          <div style="font-weight: 700; margin-bottom: 4px;">No book in progress yet</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Scan a book or explore the library to start reading!</div>
+          <button id="dash-explore-btn" class="btn-primary 3d-btn-primary" style="padding: 10px 18px; font-size: 0.85rem;">
+            Explore 1,005 Books
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Action Shortcuts -->
+      <div class="dash-quick-actions">
+        <button id="dash-quick-scan-btn" class="quick-action-card 3d-card">
+          <div class="qa-icon-wrap bg-blue">📸</div>
+          <div class="qa-text">
+            <div class="qa-title">Scan Book Cover</div>
+            <div class="qa-sub">AI Multimodal Vision</div>
+          </div>
+        </button>
+
+        <button id="dash-quick-timer-btn" class="quick-action-card 3d-card">
+          <div class="qa-icon-wrap bg-emerald">⏱️</div>
+          <div class="qa-text">
+            <div class="qa-title">Reading Stopwatch</div>
+            <div class="qa-sub">Track Session & Pages</div>
+          </div>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ==========================================
          TAB 1: LIVE SCANNER VIEW
          ========================================== -->
-    <main id="tab-scan" class="tab-content active">
+    <main id="tab-scan" class="tab-content">
 
       <!-- Fullscreen Camera Viewfinder with 3D Holographic HUD & Floating Controls -->
       <div class="scanner-viewport fullscreen-viewport">
@@ -300,7 +433,78 @@
     </section>
 
     <!-- ==========================================
-         TAB 3: USER PROFILE & STATS
+         TAB 3: READING TIMER & STOPWATCH SCREEN
+         ========================================== -->
+    <section id="tab-timer" class="tab-content">
+      <div class="timer-card 3d-card">
+        <div class="timer-header">
+          <div class="timer-badge">⏱️ READING SESSION</div>
+          <h2 class="timer-headline">Focus Reading Timer</h2>
+          <p class="timer-sub">Track your reading time, log pages read, and build a lasting daily habit.</p>
+        </div>
+
+        <!-- Book Selection for Timer -->
+        <div class="timer-book-picker">
+          <label class="field-micro-label">Select Book from Library:</label>
+          <select id="timer-book-select" class="timer-select">
+            <option value="">-- Choose a book to read --</option>
+          </select>
+        </div>
+
+        <!-- Big 3D Digital Timer Display -->
+        <div class="digital-clock-container">
+          <div class="digital-clock-outer">
+            <div class="clock-digits" id="timer-display">00:00:00</div>
+            <div class="clock-label" id="timer-status-label">Ready to Read</div>
+          </div>
+        </div>
+
+        <!-- Preset Session Buttons -->
+        <div class="timer-presets">
+          <button type="button" class="preset-btn" data-minutes="15">15 Min</button>
+          <button type="button" class="preset-btn active" data-minutes="25">25 Min (Pomodoro)</button>
+          <button type="button" class="preset-btn" data-minutes="45">45 Min</button>
+          <button type="button" class="preset-btn" data-minutes="0">Open Stopwatch</button>
+        </div>
+
+        <!-- Page Number Inputs -->
+        <div class="page-log-card">
+          <div class="page-inputs-row">
+            <div class="page-input-group">
+              <label class="field-micro-label">Start Page:</label>
+              <input type="number" id="timer-start-page" class="page-input" placeholder="e.g. 1" min="0">
+            </div>
+            <div class="page-arrow-icon">➔</div>
+            <div class="page-input-group">
+              <label class="field-micro-label">End Page (Now):</label>
+              <input type="number" id="timer-end-page" class="page-input" placeholder="e.g. 25" min="0">
+            </div>
+            <div class="page-input-group">
+              <label class="field-micro-label">Total Book Pages:</label>
+              <input type="number" id="timer-total-pages" class="page-input" placeholder="e.g. 300" min="1" value="300">
+            </div>
+          </div>
+        </div>
+
+        <!-- Primary Timer Actions -->
+        <div class="timer-controls-row">
+          <button id="timer-toggle-btn" class="btn-primary 3d-btn-primary timer-big-btn">
+            <span id="timer-toggle-icon">▶</span>
+            <span id="timer-toggle-text">Start Reading</span>
+          </button>
+          <button id="timer-finish-btn" class="btn-secondary 3d-btn-secondary" style="display: none;">
+            ⏹ Finish Session
+          </button>
+          <button id="timer-reset-btn" class="btn-secondary 3d-btn-secondary">
+            🔄 Reset
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 4: USER PROFILE & STATS
          ========================================== -->
     <section id="tab-profile" class="tab-content">
       <div class="profile-card 3d-card">
@@ -325,6 +529,22 @@
             <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
             <span>Sign in with Google</span>
           </button>
+        </div>
+
+        <!-- Appearance Theme Toggle Card (Moved from header to profile as requested) -->
+        <div class="pref-card 3d-card" style="margin: 16px 0 10px 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 1.6rem;" id="profile-theme-icon">☀️</span>
+              <div style="text-align: left;">
+                <div style="font-weight: 800; font-size: 0.95rem;">Appearance Theme</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);" id="profile-theme-name">Clean White Porcelain</div>
+              </div>
+            </div>
+            <button type="button" id="profile-theme-toggle-btn" class="theme-switch-pill-btn">
+              Toggle Theme
+            </button>
+          </div>
         </div>
         
         <div class="stats-row">
@@ -414,6 +634,27 @@
           </div>
         </div>
 
+        <!-- Page Progress & Reading Timer Quick Launch -->
+        <div class="modal-section modal-page-progress-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="field-micro-label" style="margin: 0;">Reading Progress:</label>
+            <span id="modal-page-progress-text" style="font-size: 0.8rem; font-weight: 700; color: var(--accent-primary);">Page 0 / 300 (0%)</span>
+          </div>
+          <div class="progress-bar-wrap" style="height: 8px; margin-bottom: 10px;">
+            <div id="modal-page-progress-fill" class="progress-fill" style="width: 0%;"></div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="number" id="modal-current-page-input" class="page-input" placeholder="Current Page (e.g. 45)" min="0" style="flex: 1;">
+            <input type="number" id="modal-total-pages-input" class="page-input" placeholder="Total Pages (e.g. 300)" min="1" value="300" style="flex: 1;">
+            <button type="button" id="modal-save-page-btn" class="btn-secondary 3d-btn-secondary" style="padding: 10px 14px; font-size: 0.82rem;">
+              💾 Save
+            </button>
+          </div>
+          <button type="button" id="modal-launch-timer-btn" class="btn-primary 3d-btn-primary" style="width: 100%; margin-top: 10px; font-size: 0.85rem; padding: 10px;">
+            ⏱️ Start Reading Session with Timer
+          </button>
+        </div>
+
         <!-- Category Tag Editor -->
         <div class="modal-section">
           <label class="field-micro-label">Change Category:</label>
@@ -463,6 +704,56 @@
     </dialog>
 
     <!-- ==========================================
+         COMPLETION MOTIVATION & RECOMMENDATIONS DIALOG
+         ========================================== -->
+    <dialog id="congrats-modal" class="book-detail-dialog" closedby="any" aria-labelledby="congrats-title">
+      <div class="dialog-inner">
+        <button id="close-congrats-modal" class="modal-close-btn" aria-label="Close">✕</button>
+        
+        <div style="text-align: center; padding: 10px 0;">
+          <div style="font-size: 3.2rem; line-height: 1; margin-bottom: 10px;">🎉</div>
+          <h2 style="font-size: 1.45rem; font-weight: 800; margin-bottom: 6px;" id="congrats-title">Fantastic Reading!</h2>
+          <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;" id="congrats-body">
+            You just logged a great reading session. Every page expands your mind!
+          </p>
+        </div>
+
+        <!-- Page progress summary -->
+        <div id="congrats-session-box" class="congrats-session-summary">
+          <div class="css-stat">
+            <div class="css-val" id="congrats-minutes-val">25m</div>
+            <div class="css-lbl">Time Read</div>
+          </div>
+          <div class="css-divider"></div>
+          <div class="css-stat">
+            <div class="css-val" id="congrats-pages-val">18</div>
+            <div class="css-lbl">Pages Read</div>
+          </div>
+          <div class="css-divider"></div>
+          <div class="css-stat">
+            <div class="css-val" id="congrats-bookmark-val">Page 82</div>
+            <div class="css-lbl">Current Page</div>
+          </div>
+        </div>
+
+        <!-- Smart Library Recommendations Section -->
+        <div class="recs-section">
+          <div class="recs-header">
+            <span style="font-weight: 800; font-size: 0.95rem;">💡 Recommended Books For You</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">From 1,005 Catalog</span>
+          </div>
+          <div class="recs-grid" id="congrats-recs-grid">
+            <!-- Dynamically populated with recommended books -->
+          </div>
+        </div>
+
+        <button type="button" id="congrats-done-btn" class="btn-primary 3d-btn-primary" style="width: 100%; margin-top: 14px;">
+          Awesome, Continue Reading 🚀
+        </button>
+      </div>
+    </dialog>
+
+    <!-- ==========================================
          GOOGLE AUTH & AVATAR PICKER MODAL (<dialog>)
          ========================================== -->
     <dialog id="auth-modal" class="auth-dialog" closedby="any" aria-labelledby="auth-modal-title">
@@ -470,10 +761,10 @@
         <button id="close-auth-modal" class="modal-close-btn" aria-label="Close">✕</button>
 
         <h2 id="auth-modal-title" style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">
-          Google Account & Profile
+          Welcome to BookNest AI
         </h2>
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-          Sign in with your Google account to sync your books and reading progress.
+          Sign in once to sync your 1,000+ library, reading streak, and timer progress across devices.
         </p>
 
         <!-- Google Direct One-Click Sign-In Card -->
@@ -564,16 +855,24 @@
     </aside>
 
     <!-- ==========================================
-         BOTTOM NAVIGATION BAR
+         BOTTOM NAVIGATION BAR (5-TAB MODERN LAYOUT)
          ========================================== -->
     <nav class="bottom-nav">
-      <a href="#" class="nav-item active" data-tab="tab-scan">
+      <a href="#" class="nav-item active" data-tab="tab-dashboard">
+        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span>Home</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="tab-scan">
         <svg viewBox="0 0 24 24"><path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm9.5-6.5v3h-3v-3h3M20 5h-6v6h6V5zm-2 10h-2v2h2v-2zm-2-2h-2v2h2v-2zm-2 4h-2v2h2v-2zm4 2h-2v2h2v-2zm2-2h-2v2h2v-2z"/></svg>
-        <span>Scanner</span>
+        <span>Scan</span>
       </a>
       <a href="#" class="nav-item" data-tab="tab-library">
         <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
         <span>Library</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="tab-timer">
+        <svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        <span>Timer</span>
       </a>
       <a href="#" class="nav-item" data-tab="tab-profile">
         <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>

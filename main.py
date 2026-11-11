@@ -1,4 +1,5 @@
 import os
+import json
 import uuid
 import shutil
 import asyncio
@@ -22,7 +23,8 @@ from firebase_service import (
     get_user_profile,
     update_user_profile,
     update_book_status,
-    upsert_google_user
+    upsert_google_user,
+    log_reading_session
 )
 
 # -------- FLOW 2 & VISION IMPORTS --------
@@ -416,9 +418,48 @@ async def api_update_library(request: Request, payload: dict = Body(...)):
         title=title,
         status=payload.get("status"),
         rating=payload.get("rating"),
-        genre=payload.get("genre")
+        genre=payload.get("genre"),
+        current_page=payload.get("current_page"),
+        total_pages=payload.get("total_pages"),
+        add_minutes=int(payload.get("add_minutes", 0))
     )
     return {"status": "updated", "title": title}
+
+
+@app.post("/api/reading/log")
+async def api_log_reading(request: Request, payload: dict = Body(...)):
+    uid = await get_uid(request)
+    title = payload.get("title", "")
+    minutes = int(payload.get("minutes_read", payload.get("minutes", 0)))
+    start_page = int(payload.get("start_page", 0))
+    end_page = int(payload.get("end_page", 0))
+    total_pages = int(payload.get("total_pages", 0))
+    res = log_reading_session(uid, title, minutes, start_page, end_page)
+    if total_pages > 0:
+        update_book_status(uid, title, total_pages=total_pages)
+    return res
+
+
+@app.get("/api/recommendations")
+async def api_recommendations(request: Request, genre: str = Query("Fiction"), limit: int = Query(4)):
+    # Provide smart recommendations based on library genre from master catalog
+    catalog_path = os.path.join("data", "books.json")
+    if not os.path.exists(catalog_path):
+        return []
+    
+    with open(catalog_path, "r", encoding="utf-8") as f:
+        catalog = json.load(f)
+
+    target_genre = (genre or "").lower().split(" ")[0]
+    matched = [b for b in catalog if target_genre in (b.get("genre") or "").lower()]
+    if len(matched) < limit:
+        # Fallback to random popular books
+        matched = catalog[:limit]
+    else:
+        import random
+        matched = random.sample(matched, min(limit, len(matched)))
+
+    return matched
 
 
 # =========================================================

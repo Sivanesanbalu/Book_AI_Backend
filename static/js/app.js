@@ -42,14 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   loadStoredUser();
   initNavigation();
-  initCamera();
   initAuthUI();
   initModals();
   initCategoryFilters();
+  initDashboardEvents();
+  initTimerEvents();
   loadLibrary();
   loadProfile();
   loadNetworkInfo();
   registerPWA();
+  checkFirstTimeUser();
 
   // Shutter action
   if (shutterBtn) shutterBtn.addEventListener('click', captureAndScan);
@@ -69,6 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Theme toggle
   if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+  const profileThemeBtn = document.getElementById('profile-theme-toggle-btn');
+  if (profileThemeBtn) profileThemeBtn.addEventListener('click', toggleTheme);
 
   // Chat close
   document.getElementById('close-chat-btn')?.addEventListener('click', () => {
@@ -125,6 +129,10 @@ function toggleTheme() {
 function updateThemeIcon(theme) {
   const icon = document.getElementById('theme-icon');
   if (icon) icon.textContent = theme === 'light' ? '🌙' : '☀️';
+  const profileThemeName = document.getElementById('profile-theme-name');
+  if (profileThemeName) {
+    profileThemeName.textContent = theme === 'light' ? 'Clean White Porcelain ☀️' : 'Dark Luxury Midnight 🌙';
+  }
 }
 
 // =========================================================
@@ -150,6 +158,8 @@ function switchToTab(targetTab) {
     stopCamera();
   }
 
+  if (targetTab === 'tab-dashboard') updateDashboardView();
+  if (targetTab === 'tab-timer') initReadingTimer();
   if (targetTab === 'tab-library') loadLibrary();
   if (targetTab === 'tab-profile') loadProfile();
 }
@@ -179,6 +189,17 @@ function loadStoredUser() {
     }
   }
   updateUserUI();
+}
+
+function checkFirstTimeUser() {
+  const isAuth = localStorage.getItem('booknest_user_authenticated');
+  if (!isAuth) {
+    setTimeout(() => {
+      if (authModal && !authModal.open) {
+        authModal.showModal();
+      }
+    }, 700);
+  }
 }
 
 function updateUserUI() {
@@ -212,8 +233,11 @@ function initAuthUI() {
   authHeaderBtn?.addEventListener('click', () => authModal.showModal());
   googleLoginBtn?.addEventListener('click', () => authModal.showModal());
 
-  // Close Auth Modal
-  closeAuthModal?.addEventListener('click', () => authModal.close());
+  // Close Auth Modal (mark as acknowledged so it won't re-pop)
+  closeAuthModal?.addEventListener('click', () => {
+    localStorage.setItem('booknest_user_authenticated', 'true');
+    authModal.close();
+  });
 
   // Direct 1-Click Google Sign-In with apsiva69@gmail.com (Sivanesan Balu)
   quickGoogleUserBtn?.addEventListener('click', () => {
@@ -259,6 +283,7 @@ async function performGoogleLogin(name, email, avatar) {
     });
     currentUser = { ...currentUser, ...payload };
     localStorage.setItem('booknest_user', JSON.stringify(currentUser));
+    localStorage.setItem('booknest_user_authenticated', 'true');
     updateUserUI();
     authModal.close();
     showToast(`✅ Welcome, ${currentUser.name}! Signed in with Google`);
@@ -815,6 +840,7 @@ async function loadLibrary() {
     });
     libraryBooks = await res.json();
     updateDashboardStats(libraryBooks);
+    updateDashboardView();
     filterLibrary();
   } catch (err) {
     console.error('Error loading library:', err);
@@ -959,6 +985,14 @@ function loadMoreBooks() {
 function initModals() {
   document.getElementById('close-book-modal')?.addEventListener('click', () => bookModal.close());
 
+  // Close congrats modal
+  document.getElementById('close-congrats-modal')?.addEventListener('click', () => {
+    document.getElementById('congrats-modal')?.close();
+  });
+  document.getElementById('congrats-done-btn')?.addEventListener('click', () => {
+    document.getElementById('congrats-modal')?.close();
+  });
+
   // Star ratings in modal
   document.querySelectorAll('#modal-star-rating .star').forEach(star => {
     star.addEventListener('click', () => {
@@ -980,11 +1014,12 @@ function initModals() {
       if (selectedModalBook) {
         selectedModalBook.status = newStatus;
         if (newStatus === 'Completed') {
-          triggerConfettiCelebration(selectedModalBook.title);
+          triggerSessionCelebration(selectedModalBook.title, 0, 0, selectedModalBook.total_pages || 300, selectedModalBook.total_pages || 300);
         }
         updateBookOnServer(selectedModalBook);
         loadLibrary();
         loadProfile();
+        updateDashboardView();
       }
     });
   });
@@ -995,6 +1030,59 @@ function initModals() {
       selectedModalBook.genre = e.target.value;
       updateBookOnServer(selectedModalBook);
       loadLibrary();
+    }
+  });
+
+  // Modal Page Progress Bookmark Save
+  document.getElementById('modal-save-page-btn')?.addEventListener('click', async () => {
+    if (!selectedModalBook) return;
+    const curP = parseInt(document.getElementById('modal-current-page-input').value) || 0;
+    const totP = parseInt(document.getElementById('modal-total-pages-input').value) || 300;
+
+    selectedModalBook.current_page = curP;
+    selectedModalBook.total_pages = totP;
+
+    const pct = Math.min(100, Math.round((curP / totP) * 100));
+    const progText = document.getElementById('modal-page-progress-text');
+    const progFill = document.getElementById('modal-page-progress-fill');
+    if (progText) progText.textContent = `Page ${curP} / ${totP} (${pct}%)`;
+    if (progFill) progFill.style.width = `${pct}%`;
+
+    let newStatus = selectedModalBook.status;
+    if (curP >= totP && totP > 0) {
+      newStatus = 'Completed';
+      selectedModalBook.status = 'Completed';
+      triggerSessionCelebration(selectedModalBook.title, 0, 0, curP, totP);
+    }
+
+    try {
+      await fetch('/api/library/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentUser.uid}`
+        },
+        body: JSON.stringify({
+          title: selectedModalBook.title,
+          current_page: curP,
+          total_pages: totP,
+          status: newStatus
+        })
+      });
+      showToast(`🔖 Saved Bookmark: Page ${curP} of ${totP}!`);
+      updateDashboardView();
+      loadLibrary();
+    } catch (e) {
+      showToast('⚠️ Could not save page bookmark');
+    }
+  });
+
+  // Modal Launch Timer with current book
+  document.getElementById('modal-launch-timer-btn')?.addEventListener('click', () => {
+    if (selectedModalBook) {
+      selectTimerBook(selectedModalBook.title);
+      bookModal.close();
+      switchToTab('tab-timer');
     }
   });
 
@@ -1042,6 +1130,21 @@ function openBookModal(encodedTitle) {
   // Set star rating
   setModalRating(book.rating || 5);
 
+  // Set Page Progress & Inputs
+  const curPage = book.current_page || 0;
+  const totPage = book.total_pages || 300;
+  const pct = Math.min(100, Math.round((curPage / totPage) * 100));
+
+  const curInput = document.getElementById('modal-current-page-input');
+  const totInput = document.getElementById('modal-total-pages-input');
+  const progText = document.getElementById('modal-page-progress-text');
+  const progFill = document.getElementById('modal-page-progress-fill');
+
+  if (curInput) curInput.value = curPage;
+  if (totInput) totInput.value = totPage;
+  if (progText) progText.textContent = `Page ${curPage} / ${totPage} (${pct}%)`;
+  if (progFill) progFill.style.width = `${pct}%`;
+
   // Set scenario / synopsis
   const scenarioBox = document.getElementById('modal-scenario-content');
   if (book.overview || book.scenario) {
@@ -1079,7 +1182,9 @@ async function updateBookOnServer(book) {
         title: book.title,
         status: book.status,
         rating: book.rating,
-        genre: book.genre
+        genre: book.genre,
+        current_page: book.current_page || 0,
+        total_pages: book.total_pages || 300
       })
     });
     showToast(`✓ Updated '${book.title}'`);
@@ -1289,5 +1394,474 @@ function formatMarkdown(text) {
 function registerPWA() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(console.warn);
+  }
+}
+
+// =========================================================
+// 🏠 DASHBOARD CONTROLLER & HABIT REMINDERS
+// =========================================================
+const READING_QUOTES = [
+  { quote: '"A reader lives a thousand lives before he dies."', author: 'George R.R. Martin' },
+  { quote: '"Today a reader, tomorrow a leader."', author: 'Margaret Fuller' },
+  { quote: '"Reading is to the mind what exercise is to the body."', author: 'Joseph Addison' },
+  { quote: '"Books are a uniquely portable magic."', author: 'Stephen King' },
+  { quote: '"The more that you read, the more things you will know."', author: 'Dr. Seuss' },
+  { quote: '"Think before you speak. Read before you think."', author: 'Fran Lebowitz' }
+];
+
+function initDashboardEvents() {
+  document.getElementById('quick-start-reminder-btn')?.addEventListener('click', () => {
+    switchToTab('tab-timer');
+  });
+
+  document.getElementById('see-all-reading-btn')?.addEventListener('click', () => {
+    switchToTab('tab-library');
+  });
+
+  document.getElementById('dash-explore-btn')?.addEventListener('click', () => {
+    switchToTab('tab-scan');
+  });
+
+  document.getElementById('dash-quick-scan-btn')?.addEventListener('click', () => {
+    switchToTab('tab-scan');
+  });
+
+  document.getElementById('dash-quick-timer-btn')?.addEventListener('click', () => {
+    switchToTab('tab-timer');
+  });
+}
+
+function updateDashboardView() {
+  const greetingEl = document.getElementById('dash-greeting-text');
+  const quoteEl = document.getElementById('dash-daily-quote');
+  const heroAvatar = document.getElementById('dash-hero-avatar');
+  const streakText = document.getElementById('dash-streak-text');
+  const reminderMsg = document.getElementById('daily-reminder-msg');
+
+  // Greeting
+  const firstName = (currentUser.name || 'Reader').split(' ')[0];
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+  if (greetingEl) greetingEl.textContent = `${timeGreeting}, ${firstName}!`;
+
+  // Hero Avatar
+  if (heroAvatar) heroAvatar.src = currentUser.avatar;
+
+  // Streak
+  const streak = parseInt(localStorage.getItem('booknest_streak') || '3');
+  if (streakText) streakText.textContent = `${streak} Day Streak 🔥`;
+
+  // Quote of the Day
+  if (quoteEl) {
+    const q = READING_QUOTES[Math.floor(Math.random() * READING_QUOTES.length)];
+    quoteEl.textContent = `${q.quote} — ${q.author}`;
+  }
+
+  // Aggregate Metrics from libraryBooks
+  const total = libraryBooks.length;
+  const completed = libraryBooks.filter(b => (b.status || '').toLowerCase().includes('complet') || (b.status || '').toLowerCase().includes('finish')).length;
+  const reading = libraryBooks.filter(b => (b.status || '').toLowerCase().includes('read') && !(b.status || '').toLowerCase().includes('complet')).length;
+  const totalMinutes = libraryBooks.reduce((sum, b) => sum + (parseInt(b.reading_minutes) || 0), 0);
+  const goal = currentUser.reading_goal || 25;
+  const goalPct = Math.min(100, Math.round((completed / goal) * 100));
+
+  const dTotal = document.getElementById('dash-total-books');
+  const dReading = document.getElementById('dash-reading-books');
+  const dCompleted = document.getElementById('dash-completed-books');
+  const dMinutes = document.getElementById('dash-reading-mins');
+  const dGoalPct = document.getElementById('dash-goal-pct');
+  const dGoalFill = document.getElementById('dash-goal-fill');
+  const dGoalSub = document.getElementById('dash-goal-sub');
+
+  if (dTotal) dTotal.textContent = total;
+  if (dReading) dReading.textContent = reading;
+  if (dCompleted) dCompleted.textContent = completed;
+  if (dMinutes) dMinutes.textContent = `${totalMinutes}m`;
+  if (dGoalPct) dGoalPct.textContent = `${goalPct}%`;
+  if (dGoalFill) dGoalFill.style.width = `${goalPct}%`;
+  if (dGoalSub) dGoalSub.textContent = `${completed} of ${goal} Books Completed`;
+
+  // Find Active Reading Book
+  const activeBook = libraryBooks.find(b => (b.status || '').toLowerCase() === 'reading') || libraryBooks[0];
+  const activeReadingCard = document.getElementById('active-reading-card');
+  const noReadingState = document.getElementById('no-reading-placeholder');
+
+  if (activeBook) {
+    if (activeReadingCard) activeReadingCard.style.display = 'flex';
+    if (noReadingState) noReadingState.style.display = 'none';
+
+    const arCover = document.getElementById('ar-cover');
+    const arTitle = document.getElementById('ar-title');
+    const arAuthor = document.getElementById('ar-author');
+    const arGenre = document.getElementById('ar-genre');
+
+    if (arCover) arCover.src = activeBook.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=200&q=80';
+    if (arTitle) arTitle.textContent = activeBook.title;
+    if (arAuthor) arAuthor.textContent = `by ${activeBook.author || 'Author Unknown'}`;
+    if (arGenre) arGenre.textContent = activeBook.genre || 'Reading';
+
+    const curP = activeBook.current_page || 0;
+    const totP = activeBook.total_pages || 300;
+    const pct = Math.min(100, Math.round((curP / totP) * 100));
+
+    const arPageText = document.getElementById('ar-page-text');
+    const arPct = document.getElementById('ar-progress-pct');
+    const arFill = document.getElementById('ar-fill');
+
+    if (arPageText) arPageText.textContent = `Page ${curP} of ${totP}`;
+    if (arPct) arPct.textContent = `${pct}%`;
+    if (arFill) arFill.style.width = `${pct}%`;
+
+    if (reminderMsg) {
+      reminderMsg.textContent = `You're currently reading '${activeBook.title}'! Dive into page ${curP || 1} today to keep your daily streak alive 🚀`;
+    }
+
+    const arTimerBtn = document.getElementById('ar-open-timer-btn');
+    if (arTimerBtn) {
+      arTimerBtn.onclick = () => {
+        selectTimerBook(activeBook.title);
+        switchToTab('tab-timer');
+      };
+    }
+
+    const arUpdateBtn = document.getElementById('ar-update-page-btn');
+    if (arUpdateBtn) {
+      arUpdateBtn.onclick = () => {
+        openBookModal(encodeURIComponent(activeBook.title));
+      };
+    }
+  } else {
+    if (activeReadingCard) activeReadingCard.style.display = 'none';
+    if (noReadingState) noReadingState.style.display = 'block';
+    if (reminderMsg) {
+      reminderMsg.textContent = `Scan your first book cover or pick from library to start your daily reading journey!`;
+    }
+  }
+}
+
+// =========================================================
+// ⏱️ READING TIMER ENGINE (PRESETS, STOPWATCH, LOGGING)
+// =========================================================
+let timerInterval = null;
+let timerRunning = false;
+let timerTargetDuration = 25 * 60; // 25 min default
+let timerElapsedSeconds = 0;
+let timerMode = 'countdown'; // 'countdown' or 'stopwatch'
+let activeTimerBookTitle = '';
+
+function initTimerEvents() {
+  // Preset chips
+  document.querySelectorAll('.timer-preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.timer-preset-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const mins = parseInt(chip.getAttribute('data-mins'));
+      if (mins === 0) {
+        timerMode = 'stopwatch';
+        timerTargetDuration = 0;
+      } else {
+        timerMode = 'countdown';
+        timerTargetDuration = mins * 60;
+      }
+      resetTimer();
+    });
+  });
+
+  // Toggle Start / Pause
+  document.getElementById('timer-toggle-btn')?.addEventListener('click', toggleTimer);
+
+  // Finish session
+  document.getElementById('timer-finish-btn')?.addEventListener('click', finishTimerSession);
+
+  // Reset
+  document.getElementById('timer-reset-btn')?.addEventListener('click', resetTimer);
+
+  // Book select change
+  document.getElementById('timer-book-select')?.addEventListener('change', (e) => {
+    onTimerBookSelected(e.target.value);
+  });
+}
+
+function initReadingTimer() {
+  const select = document.getElementById('timer-book-select');
+  if (!select) return;
+
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">-- Choose a Book to Read --</option>';
+
+  libraryBooks.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.title;
+    opt.textContent = `${b.title} (${b.current_page || 0}/${b.total_pages || 300}p)`;
+    select.appendChild(opt);
+  });
+
+  if (activeTimerBookTitle) {
+    select.value = activeTimerBookTitle;
+    onTimerBookSelected(activeTimerBookTitle);
+  } else if (currentVal) {
+    select.value = currentVal;
+    onTimerBookSelected(currentVal);
+  } else if (libraryBooks.length > 0) {
+    const readingBook = libraryBooks.find(b => (b.status || '').toLowerCase() === 'reading') || libraryBooks[0];
+    select.value = readingBook.title;
+    onTimerBookSelected(readingBook.title);
+  }
+}
+
+function selectTimerBook(bookTitle) {
+  activeTimerBookTitle = bookTitle;
+  const select = document.getElementById('timer-book-select');
+  if (select) {
+    select.value = bookTitle;
+    onTimerBookSelected(bookTitle);
+  }
+}
+
+function onTimerBookSelected(title) {
+  activeTimerBookTitle = title;
+  const book = libraryBooks.find(b => b.title === title);
+  if (book) {
+    const startInput = document.getElementById('timer-start-page');
+    const endInput = document.getElementById('timer-end-page');
+    const totalInput = document.getElementById('timer-total-pages');
+
+    const curP = book.current_page || 0;
+    const totP = book.total_pages || 300;
+
+    if (startInput) startInput.value = curP;
+    if (endInput) endInput.value = Math.min(totP, curP + 10);
+    if (totalInput) totalInput.value = totP;
+  }
+}
+
+function toggleTimer() {
+  const toggleBtn = document.getElementById('timer-toggle-btn');
+  const toggleIcon = document.getElementById('timer-toggle-icon');
+  const toggleText = document.getElementById('timer-toggle-text');
+  const finishBtn = document.getElementById('timer-finish-btn');
+  const statusLabel = document.getElementById('timer-status-label');
+
+  if (timerRunning) {
+    // Pause
+    clearInterval(timerInterval);
+    timerRunning = false;
+    if (toggleIcon) toggleIcon.textContent = '▶';
+    if (toggleText) toggleText.textContent = 'Resume Reading';
+    if (toggleBtn) toggleBtn.style.background = 'var(--gradient-primary)';
+    if (statusLabel) statusLabel.textContent = 'Session Paused ⏸';
+  } else {
+    // Start / Resume
+    timerRunning = true;
+    if (toggleIcon) toggleIcon.textContent = '⏸';
+    if (toggleText) toggleText.textContent = 'Pause Reading';
+    if (toggleBtn) toggleBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+    if (finishBtn) finishBtn.style.display = 'inline-flex';
+    if (statusLabel) statusLabel.textContent = 'Focus Reading in Progress... 📖';
+
+    timerInterval = setInterval(() => {
+      timerElapsedSeconds++;
+      updateTimerDisplay();
+
+      if (timerMode === 'countdown' && timerElapsedSeconds >= timerTargetDuration) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        showToast('🔔 Reading Goal Reached! Great session!');
+        finishTimerSession();
+      }
+    }, 1000);
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerElapsedSeconds = 0;
+
+  const toggleIcon = document.getElementById('timer-toggle-icon');
+  const toggleText = document.getElementById('timer-toggle-text');
+  const toggleBtn = document.getElementById('timer-toggle-btn');
+  const finishBtn = document.getElementById('timer-finish-btn');
+  const statusLabel = document.getElementById('timer-status-label');
+
+  if (toggleIcon) toggleIcon.textContent = '▶';
+  if (toggleText) toggleText.textContent = 'Start Reading';
+  if (toggleBtn) toggleBtn.style.background = 'var(--gradient-primary)';
+  if (finishBtn) finishBtn.style.display = 'none';
+  if (statusLabel) statusLabel.textContent = 'Ready to Read';
+
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const display = document.getElementById('timer-display');
+  if (!display) return;
+
+  let secondsToShow = timerMode === 'countdown' 
+    ? Math.max(0, timerTargetDuration - timerElapsedSeconds) 
+    : timerElapsedSeconds;
+
+  const hrs = Math.floor(secondsToShow / 3600);
+  const mins = Math.floor((secondsToShow % 3600) / 60);
+  const secs = secondsToShow % 60;
+
+  const pad = (n) => String(n).padStart(2, '0');
+  display.textContent = `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+}
+
+async function finishTimerSession() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+
+  const minutesRead = Math.max(1, Math.round(timerElapsedSeconds / 60));
+  const startPage = parseInt(document.getElementById('timer-start-page')?.value) || 0;
+  const endPage = parseInt(document.getElementById('timer-end-page')?.value) || startPage + 1;
+  const totalPages = parseInt(document.getElementById('timer-total-pages')?.value) || 300;
+  const bookTitle = activeTimerBookTitle || 'Focus Session';
+
+  // Find book and update local state
+  const book = libraryBooks.find(b => b.title === bookTitle);
+  if (book) {
+    book.current_page = endPage;
+    book.total_pages = totalPages;
+    book.reading_minutes = (book.reading_minutes || 0) + minutesRead;
+    if (endPage >= totalPages) {
+      book.status = 'Completed';
+    }
+  }
+
+  // Update streak in localStorage
+  const currentStreak = parseInt(localStorage.getItem('booknest_streak') || '3') + 1;
+  localStorage.setItem('booknest_streak', currentStreak);
+
+  // Send session log to server
+  try {
+    await fetch('/api/reading/log', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentUser.uid}`
+      },
+      body: JSON.stringify({
+        title: bookTitle,
+        minutes_read: minutesRead,
+        start_page: startPage,
+        end_page: endPage,
+        total_pages: totalPages
+      })
+    });
+  } catch (err) {
+    console.error('Error logging reading session:', err);
+  }
+
+  // Trigger celebration popup & recommendations
+  triggerSessionCelebration(bookTitle, minutesRead, startPage, endPage, totalPages);
+
+  // Reset timer UI
+  resetTimer();
+  updateDashboardView();
+  loadLibrary();
+  loadProfile();
+}
+
+// =========================================================
+// 🏆 COMPLETION CELEBRATION & SMART RECOMMENDATIONS
+// =========================================================
+async function triggerSessionCelebration(bookTitle, minutesRead, startPage, endPage, totalPages) {
+  const modal = document.getElementById('congrats-modal');
+  if (!modal) return;
+
+  const isCompleted = endPage >= totalPages && totalPages > 0;
+  const titleEl = document.getElementById('congrats-title');
+  const bodyEl = document.getElementById('congrats-body');
+  const minVal = document.getElementById('congrats-minutes-val');
+  const pageVal = document.getElementById('congrats-pages-val');
+  const bmVal = document.getElementById('congrats-bookmark-val');
+  const recsGrid = document.getElementById('congrats-recs-grid');
+
+  if (titleEl) titleEl.textContent = isCompleted ? '🏆 Congratulations! Book Completed!' : 'Fantastic Reading Sprint! 🎉';
+  if (bodyEl) {
+    bodyEl.textContent = isCompleted 
+      ? `You just finished '${bookTitle}'! Outstanding commitment. Here are curated recommendations from your 1,005 book catalog:`
+      : `Awesome focus! You logged ${minutesRead}m of mindful reading and advanced to Page ${endPage}. Every page makes you wiser!`;
+  }
+
+  if (minVal) minVal.textContent = `${minutesRead}m`;
+  const pagesRead = Math.max(0, endPage - startPage);
+  if (pageVal) pageVal.textContent = `${pagesRead || 1}`;
+  if (bmVal) bmVal.textContent = `Page ${endPage}`;
+
+  // Confetti
+  if (typeof confetti === 'function') {
+    confetti({
+      particleCount: 120,
+      spread: 80,
+      origin: { y: 0.6 },
+      colors: ['#6366f1', '#10b981', '#06b6d4', '#f59e0b', '#ec4899']
+    });
+  }
+
+  // Fetch recommendations based on genre
+  if (recsGrid) {
+    recsGrid.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; grid-column: 1/-1;">Loading personalized recommendations...</div>';
+    try {
+      const book = libraryBooks.find(b => b.title === bookTitle);
+      const genre = book?.genre || 'Fiction';
+      const res = await fetch(`/api/recommendations?genre=${encodeURIComponent(genre)}&limit=3`);
+      const recs = await res.json();
+
+      if (recs && recs.length > 0) {
+        recsGrid.innerHTML = recs.map(r => `
+          <div class="rec-card 3d-card" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px;">
+            <img src="${r.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=120&q=80'}" style="width: 44px; height: 60px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" alt="cover">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(r.title)}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">by ${escapeHtml(r.author)}</div>
+              <span style="display: inline-block; font-size: 0.65rem; padding: 2px 6px; border-radius: 8px; background: rgba(99,102,241,0.1); color: var(--accent-primary); font-weight: 600; margin-top: 4px;">${escapeHtml(r.genre || 'Recommended')}</span>
+            </div>
+            <button type="button" class="btn-secondary 3d-btn-secondary" style="padding: 6px 10px; font-size: 0.75rem; white-space: nowrap;" onclick="addRecommendedBook('${encodeURIComponent(JSON.stringify(r))}')">
+              + Add
+            </button>
+          </div>
+        `).join('');
+      } else {
+        recsGrid.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; grid-column: 1/-1;">Explore more titles in your Library tab!</div>';
+      }
+    } catch (e) {
+      console.warn('Could not fetch recommendations', e);
+      recsGrid.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; grid-column: 1/-1;">Check out your library for more!</div>';
+    }
+  }
+
+  modal.showModal();
+}
+
+async function addRecommendedBook(encodedJson) {
+  try {
+    const bookData = JSON.parse(decodeURIComponent(encodedJson));
+    const res = await fetch('/api/library/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentUser.uid}`
+      },
+      body: JSON.stringify({
+        title: bookData.title,
+        author: bookData.author,
+        genre: bookData.genre,
+        cover_url: bookData.cover_url,
+        overview: bookData.overview,
+        status: 'Want to Read',
+        rating: 5,
+        total_pages: 300
+      })
+    });
+    if (res.ok) {
+      showToast(`✨ Added '${bookData.title}' to your Library!`);
+      loadLibrary();
+      updateDashboardView();
+    }
+  } catch (err) {
+    showToast('⚠️ Could not add recommended book');
   }
 }
