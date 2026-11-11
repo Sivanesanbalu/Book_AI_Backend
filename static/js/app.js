@@ -2053,7 +2053,6 @@ async function addRecommendedBook(encodedJson) {
 function initDailyReminderNotification() {
   const toggle = document.getElementById('daily-notif-toggle');
   const timeSelect = document.getElementById('notif-time-select');
-  const testBtn = document.getElementById('test-daily-notif-btn');
   const statusDesc = document.getElementById('notif-status-desc');
 
   // Load saved preferences
@@ -2105,17 +2104,6 @@ function initDailyReminderNotification() {
     }
   });
 
-  // Test button handler
-  testBtn?.addEventListener('click', async () => {
-    if ('Notification' in window && Notification.permission !== 'granted') {
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') {
-        showToast('⚠️ Please allow notifications in prompt');
-      }
-    }
-    sendDailyAttractionNotification(true);
-  });
-
   // Check on load & every 60 seconds
   checkDailyAttractionNotification();
   setInterval(checkDailyAttractionNotification, 60000);
@@ -2145,12 +2133,12 @@ function checkDailyAttractionNotification() {
 
   // Trigger if within scheduled time
   if (currentMinutes >= targetMinutes) {
-    sendDailyAttractionNotification(false);
+    sendDailyAttractionNotification();
     localStorage.setItem('booknest_last_notif_date', todayStr);
   }
 }
 
-function sendDailyAttractionNotification(isTest = false) {
+function sendDailyAttractionNotification() {
   const streak = parseInt(localStorage.getItem('booknest_streak') || '3');
   const readingBook = libraryBooks.find(b => (b.status || '').toLowerCase() === 'reading');
   const wishlistBook = libraryBooks.find(b => {
@@ -2198,11 +2186,7 @@ function sendDailyAttractionNotification(isTest = false) {
   }
 
   // 2. In-App Attraction Notification Toast
-  if (isTest) {
-    showToast(`🔔 Test Alert: ${notifTitle} (Daily reminder active!)`);
-  } else {
-    showToast(`🔔 ${notifTitle} — ${notifBody}`);
-  }
+  showToast(`🔔 ${notifTitle} — ${notifBody}`);
 
   // Vibrate phone if supported
   if ('vibrate' in navigator) {
