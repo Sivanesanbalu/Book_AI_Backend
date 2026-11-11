@@ -57,7 +57,7 @@
       <div class="install-banner">
         <div class="install-text">
           <span class="pulse-dot"></span>
-          <span><strong>AI Visual Scanner</strong> • Point camera at any cover</span>
+          <span><strong>AI Visual Scanner</strong> • Point camera at any book cover</span>
         </div>
         <a href="/download" class="apk-chip" title="Download Android APK">
           📥 APK
@@ -75,7 +75,7 @@
           <div class="hud-corner hud-br"></div>
           <div class="hud-reticle"></div>
         </div>
-        <div class="hud-caption">புத்தகத்தின் அட்டையை காட்டவும் (Align Book Cover)</div>
+        <div class="hud-caption">Align Book Cover in Viewfinder</div>
 
         <!-- 3D Scanning Hologram Loading Overlay -->
         <div id="scanning-overlay" class="scanning-overlay" style="display: none;">
@@ -133,13 +133,13 @@
             
             <!-- Category Selector on Scan Result -->
             <div class="category-select-wrap">
-              <label class="field-micro-label">Category / வகை:</label>
+              <label class="field-micro-label">Category:</label>
               <select id="result-category-select" class="category-select">
-                <option value="Comics 💥">Comics 💥 (காமிக்ஸ்)</option>
-                <option value="Manga 🎌">Manga 🎌 (மங்கா)</option>
-                <option value="Fiction 📚">Fiction 📚 (புனைகதை)</option>
+                <option value="Comics 💥">Comics 💥</option>
+                <option value="Manga 🎌">Manga 🎌</option>
+                <option value="Fiction 📚">Fiction 📚</option>
                 <option value="Sci-Fi & Fantasy 🚀">Sci-Fi & Fantasy 🚀</option>
-                <option value="Self-Help 💡">Self-Help 💡 (சுய முன்னேற்றம்)</option>
+                <option value="Self-Help 💡">Self-Help 💡</option>
                 <option value="Technology & Code 💻">Technology & Code 💻</option>
                 <option value="Mystery & Thriller 🕵️">Mystery & Thriller 🕵️</option>
                 <option value="History & Bio 📜">History & Bio 📜</option>
@@ -149,10 +149,10 @@
 
             <!-- Reading Status Selector -->
             <div class="status-select-wrap">
-              <label class="field-micro-label">Status / நிலை:</label>
+              <label class="field-micro-label">Reading Status:</label>
               <div class="status-chip-group">
                 <button type="button" class="status-chip active" data-status="Reading">📖 Reading</button>
-                <button type="button" class="status-chip" data-status="Completed">🎉 Read (முடிந்தது)</button>
+                <button type="button" class="status-chip" data-status="Completed">🎉 Completed</button>
                 <button type="button" class="status-chip" data-status="Wishlist">⭐ Wishlist</button>
               </div>
             </div>
@@ -223,7 +223,7 @@
         <!-- Reading Goal Progress Bar -->
         <div class="goal-track-wrap">
           <div class="goal-label-row">
-            <span>2026 Reading Goal (இலக்கு)</span>
+            <span>2026 Reading Goal</span>
             <span id="goal-progress-text">0 / 25 Finished</span>
           </div>
           <div class="goal-progress-track">
@@ -235,12 +235,12 @@
       <!-- Search Bar -->
       <div class="search-bar-wrap">
         <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input type="text" id="library-search" class="search-input" placeholder="Search title, author or genre...">
+        <input type="text" id="library-search" class="search-input" placeholder="Search title, author or topic...">
       </div>
 
-      <!-- Categories Filter Chips (Horizontal Scroll) -->
-      <div class="category-chips-scroll">
-        <button class="cat-chip active" data-category="ALL">🌟 All Categories</button>
+      <!-- Categories Filter Chips with + Custom Add Topic Button -->
+      <div class="category-chips-scroll" id="category-chips-bar">
+        <button class="cat-chip active" data-category="ALL">🌟 All Topics</button>
         <button class="cat-chip" data-category="Comics 💥">Comics 💥</button>
         <button class="cat-chip" data-category="Manga 🎌">Manga 🎌</button>
         <button class="cat-chip" data-category="Fiction 📚">Fiction 📚</button>
@@ -249,13 +249,23 @@
         <button class="cat-chip" data-category="Technology & Code 💻">Tech 💻</button>
         <button class="cat-chip" data-category="Mystery & Thriller 🕵️">Mystery 🕵️</button>
         <button class="cat-chip" data-category="History & Bio 📜">History 📜</button>
+        <button class="cat-chip" data-category="Business & Finance 💼">Business 💼</button>
+        <!-- Custom + Add Topic button -->
+        <button class="cat-chip add-topic-chip" id="open-add-topic-btn" title="Add Custom Topic">+ Add Topic</button>
+      </div>
+
+      <!-- Inline Add Category Input with Save Tick Button (✓) -->
+      <div id="add-topic-container" class="add-topic-box" style="display: none;">
+        <input type="text" id="new-topic-input" class="new-topic-input" placeholder="Enter topic name (e.g. Startups 🚀, Anime ⚔️)..." maxlength="30">
+        <button id="save-topic-tick-btn" class="topic-action-btn tick-btn" title="Save Category">✓</button>
+        <button id="cancel-topic-btn" class="topic-action-btn cancel-btn" title="Cancel">✕</button>
       </div>
 
       <!-- Secondary Reading Status Filter Pills -->
       <div class="filter-pills">
         <button class="filter-btn active" data-status-filter="ALL">All Status</button>
         <button class="filter-btn" data-status-filter="Reading">📖 Reading</button>
-        <button class="filter-btn" data-status-filter="Completed">🎉 Completed (படிச்சுட்டேன்)</button>
+        <button class="filter-btn" data-status-filter="Completed">🎉 Completed</button>
         <button class="filter-btn" data-status-filter="Wishlist">⭐ Wishlist</button>
       </div>
 
@@ -282,8 +292,8 @@
           <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
         </div>
 
-        <h2 id="profile-name" class="profile-name">Brother Reader</h2>
-        <div id="profile-email" class="profile-email">brother@bookai.local</div>
+        <h2 id="profile-name" class="profile-name">Reader</h2>
+        <div id="profile-email" class="profile-email">reader@booknest.local</div>
 
         <!-- Google Sign In / Sync Status -->
         <div id="google-auth-section" class="google-auth-strip">
@@ -315,11 +325,11 @@
         <!-- Edit Profile Form -->
         <div class="profile-edit-box">
           <div class="form-row">
-            <label class="field-micro-label">Your Name / பெயர்:</label>
+            <label class="field-micro-label">Your Name:</label>
             <input type="text" id="edit-profile-name" class="profile-input" placeholder="Enter your name">
           </div>
           <div class="form-row">
-            <label class="field-micro-label">2026 Reading Goal (எத்தனை புத்தகம் படிக்க வேண்டும்?):</label>
+            <label class="field-micro-label">2026 Reading Goal (Books to Read):</label>
             <input type="number" id="edit-reading-goal" class="profile-input" placeholder="25" min="1" max="500">
           </div>
           <button id="save-profile-btn" class="btn-primary 3d-btn-primary" style="margin-top: 10px;">
@@ -375,15 +385,15 @@
         <div class="step-list">
           <div class="step-row">
             <div class="step-num">1</div>
-            <div>போனின் கேமராவைத் திறந்து QR கோடை ஸ்கேன் செய்யவும் (Scan QR code).</div>
+            <div>Open your phone's camera and scan this QR code.</div>
           </div>
           <div class="step-row">
             <div class="step-num">2</div>
-            <div>HTTPS லிங்கைத் தட்டியவுடன் லைவ் ஸ்கேனர் மொபைலில் திறக்கும் (Opens live scanner).</div>
+            <div>Tap the link to immediately open the live camera scanner on your mobile device.</div>
           </div>
           <div class="step-row">
             <div class="step-num">3</div>
-            <div>Safari அல்லது Chrome-ல் <strong>"Add to Home Screen"</strong> கொடுத்தால் நேட்டிவ் ஆப் போல இன்ஸ்டால் ஆகும்!</div>
+            <div>In Safari or Chrome, tap <strong>"Add to Home Screen"</strong> to install it as an app!</div>
           </div>
         </div>
       </div>
@@ -408,10 +418,10 @@
             
             <!-- Quick Reading Status Button Row -->
             <div class="modal-status-selector">
-              <label class="field-micro-label">Reading Status / நிலை:</label>
+              <label class="field-micro-label">Reading Status:</label>
               <div class="status-btn-row">
                 <button type="button" class="m-status-btn" data-m-status="Reading">📖 Reading</button>
-                <button type="button" class="m-status-btn highlight-complete" data-m-status="Completed">🎉 Read (முடிந்தது!)</button>
+                <button type="button" class="m-status-btn highlight-complete" data-m-status="Completed">🎉 Completed</button>
                 <button type="button" class="m-status-btn" data-m-status="Wishlist">⭐ Wishlist</button>
               </div>
             </div>
@@ -420,13 +430,13 @@
 
         <!-- Category Tag Editor -->
         <div class="modal-section">
-          <label class="field-micro-label">Change Category / வகை மாற்றுக:</label>
+          <label class="field-micro-label">Change Category:</label>
           <select id="modal-category-select" class="category-select">
-            <option value="Comics 💥">Comics 💥 (காமிக்ஸ்)</option>
-            <option value="Manga 🎌">Manga 🎌 (மங்கா)</option>
-            <option value="Fiction 📚">Fiction 📚 (புனைகதை)</option>
+            <option value="Comics 💥">Comics 💥</option>
+            <option value="Manga 🎌">Manga 🎌</option>
+            <option value="Fiction 📚">Fiction 📚</option>
             <option value="Sci-Fi & Fantasy 🚀">Sci-Fi & Fantasy 🚀</option>
-            <option value="Self-Help 💡">Self-Help 💡 (சுய முன்னேற்றம்)</option>
+            <option value="Self-Help 💡">Self-Help 💡</option>
             <option value="Technology & Code 💻">Technology & Code 💻</option>
             <option value="Mystery & Thriller 🕵️">Mystery & Thriller 🕵️</option>
             <option value="History & Bio 📜">History & Bio 📜</option>
@@ -436,7 +446,7 @@
 
         <!-- Rating Stars (1 to 5) -->
         <div class="modal-section">
-          <label class="field-micro-label">Your Rating / மதிப்பீடு:</label>
+          <label class="field-micro-label">Your Rating:</label>
           <div class="star-rating-row" id="modal-star-rating">
             <span class="star" data-rating="1">★</span>
             <span class="star" data-rating="2">★</span>
@@ -474,21 +484,32 @@
         <button id="close-auth-modal" class="modal-close-btn" aria-label="Close">✕</button>
 
         <h2 id="auth-modal-title" style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">
-          Reader Profile & Login
+          Google Account & Profile
         </h2>
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-          Sign in with Google to sync your reading database across mobile and desktop.
+          Sign in with your Google account to sync your books and reading progress.
         </p>
 
-        <!-- Google Official Sign-In Button Container -->
-        <div id="google-signin-container" style="display: flex; justify-content: center; margin-bottom: 16px;">
-          <button id="instant-google-btn" class="google-full-btn">
+        <!-- Google Direct One-Click Sign-In Card -->
+        <div class="google-login-card">
+          <button id="google-quick-user-btn" class="google-user-quick-btn">
+            <div class="g-avatar-wrap">
+              <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+            </div>
+            <div style="text-align: left; flex: 1;">
+              <div style="font-weight: 800; font-size: 0.9rem;" id="quick-user-name">Sivanesan Balu</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);" id="quick-user-email">apsiva69@gmail.com</div>
+            </div>
+            <span class="g-login-action">Sign In</span>
+          </button>
+
+          <button id="instant-google-btn" class="google-full-btn" style="margin-top: 10px;">
             <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
-            <span>Continue with Google</span>
+            <span>Use another Google account</span>
           </button>
         </div>
 
-        <div class="divider-text">OR CHOOSE AN AVATAR / படம் தேர்வு செய்க</div>
+        <div class="divider-text">OR CHOOSE AN AVATAR</div>
 
         <!-- 3D Avatar Presets -->
         <div class="avatar-presets-grid">
@@ -541,10 +562,10 @@
 
       <!-- Quick Prompt Suggestions -->
       <div class="prompt-suggestions">
-        <button class="prompt-pill">📖 கதை என்ன? (Tell the story)</button>
-        <button class="prompt-pill">⚡ முக்கிய கருத்து (Core Lesson)</button>
-        <button class="prompt-pill">🎭 கதாநாயகன் யார்? (Protagonist)</button>
-        <button class="prompt-pill">🇮🇳 தமிழில் சுருக்கம் (Tamil Summary)</button>
+        <button class="prompt-pill">📖 What is the story?</button>
+        <button class="prompt-pill">⚡ Core Moral & Lesson</button>
+        <button class="prompt-pill">🎭 Main Characters</button>
+        <button class="prompt-pill">💡 Why Should I Read This?</button>
       </div>
 
       <!-- Input Bar -->

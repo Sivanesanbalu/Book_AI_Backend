@@ -190,6 +190,7 @@ function initAuthUI() {
   const authHeaderBtn = document.getElementById('auth-header-btn');
   const googleLoginBtn = document.getElementById('google-login-btn');
   const instantGoogleBtn = document.getElementById('instant-google-btn');
+  const quickGoogleUserBtn = document.getElementById('google-quick-user-btn');
   const closeAuthModal = document.getElementById('close-auth-modal');
   const changeAvatarBtn = document.getElementById('change-avatar-btn');
   const uploadCustomAvatarBtn = document.getElementById('upload-custom-avatar-btn');
@@ -201,7 +202,16 @@ function initAuthUI() {
   // Close Auth Modal
   closeAuthModal?.addEventListener('click', () => authModal.close());
 
-  // Instant Google Login Simulator (and Google GIS integration)
+  // Direct 1-Click Google Sign-In with apsiva69@gmail.com (Sivanesan Balu)
+  quickGoogleUserBtn?.addEventListener('click', () => {
+    performGoogleLogin(
+      'Sivanesan Balu',
+      'apsiva69@gmail.com',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80'
+    );
+  });
+
+  // Switch / Custom Google Login prompt
   instantGoogleBtn?.addEventListener('click', handleGoogleSignIn);
 
   // Avatar presets click
@@ -219,19 +229,13 @@ function initAuthUI() {
   avatarFileInput?.addEventListener('change', handleAvatarFileUpload);
 }
 
-async function handleGoogleSignIn() {
-  // If Google GIS client is initialized on domain, use token; else provide instant verified Google sync
-  const promptName = prompt('Enter your Google Account Name:', currentUser.name !== 'Brother Reader' ? currentUser.name : 'Sivanesan Balu');
-  if (!promptName) return;
-
-  const email = promptName.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
-  const googleAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(promptName)}&backgroundColor=e0e7ff`;
-
+async function performGoogleLogin(name, email, avatar) {
+  const uid = 'google_' + btoa(email.toLowerCase()).substring(0, 16);
   const payload = {
-    uid: 'google_' + btoa(email).substring(0, 12),
-    name: promptName,
+    uid: uid,
+    name: name,
     email: email,
-    avatar: googleAvatar
+    avatar: avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`
   };
 
   try {
@@ -240,7 +244,6 @@ async function handleGoogleSignIn() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
     currentUser = { ...currentUser, ...payload };
     localStorage.setItem('booknest_user', JSON.stringify(currentUser));
     updateUserUI();
@@ -251,6 +254,16 @@ async function handleGoogleSignIn() {
   } catch (err) {
     showToast('⚠️ Could not complete Google sign-in');
   }
+}
+
+async function handleGoogleSignIn() {
+  const promptName = prompt('Enter your Google Account Name:', currentUser.name !== 'Brother Reader' ? currentUser.name : 'Sivanesan Balu');
+  if (!promptName) return;
+
+  const email = promptName.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
+  const googleAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(promptName)}&backgroundColor=e0e7ff`;
+
+  await performGoogleLogin(promptName, email, googleAvatar);
 }
 
 async function applyNewAvatar(avatarUrl) {
@@ -500,10 +513,10 @@ function displayScanResult(data) {
   const badgeEl = document.getElementById('result-badge');
   if (isOwned) {
     badgeEl.className = 'result-badge badge-owned';
-    badgeEl.innerHTML = '✓ In Your Library (உங்களிடம் உள்ளது)';
+    badgeEl.innerHTML = '✓ In Your Library';
   } else {
     badgeEl.className = 'result-badge badge-new';
-    badgeEl.innerHTML = '★ New Book (புதிய புத்தகம்)';
+    badgeEl.innerHTML = '★ New Book';
   }
 
   // Meta
@@ -585,15 +598,116 @@ async function saveActiveBook() {
 // =========================================================
 // 📚 LIBRARY & CATEGORIES VIEW
 // =========================================================
+let customTopics = [];
+try {
+  customTopics = JSON.parse(localStorage.getItem('booknest_custom_topics') || '[]');
+} catch (e) {
+  customTopics = [];
+}
+
 function initCategoryFilters() {
-  // Category chips
-  document.querySelectorAll('.cat-chip').forEach(chip => {
+  const chipsBar = document.getElementById('category-chips-bar');
+  const openAddBtn = document.getElementById('open-add-topic-btn');
+  const addBox = document.getElementById('add-topic-container');
+  const newTopicInput = document.getElementById('new-topic-input');
+  const saveTickBtn = document.getElementById('save-topic-tick-btn');
+  const cancelTopicBtn = document.getElementById('cancel-topic-btn');
+
+  // 1. Initial click handler for default chips
+  function setupChipEvents(chip) {
     chip.addEventListener('click', () => {
       document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       currentCategoryFilter = chip.getAttribute('data-category');
       filterLibrary();
     });
+  }
+
+  document.querySelectorAll('.cat-chip:not(.add-topic-chip)').forEach(setupChipEvents);
+
+  // 2. Helper to create and inject a custom topic chip
+  function renderCustomTopicChip(topicName) {
+    if (!topicName || !chipsBar || !openAddBtn) return null;
+    
+    // Check if chip already exists
+    const existing = chipsBar.querySelector(`[data-category="${CSS.escape(topicName)}"]`);
+    if (existing) return existing;
+
+    const chip = document.createElement('button');
+    chip.className = 'cat-chip custom-cat-chip';
+    chip.setAttribute('data-category', topicName);
+    chip.textContent = topicName;
+    setupChipEvents(chip);
+
+    // Insert just before the + Add Topic button
+    chipsBar.insertBefore(chip, openAddBtn);
+
+    // Also populate category dropdowns in book modals
+    const resultCatSelect = document.getElementById('result-category-select');
+    const modalCatSelect = document.getElementById('modal-category-select');
+    [resultCatSelect, modalCatSelect].forEach(sel => {
+      if (sel && !sel.querySelector(`option[value="${CSS.escape(topicName)}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = topicName;
+        opt.textContent = topicName;
+        sel.appendChild(opt);
+      }
+    });
+
+    return chip;
+  }
+
+  // Render stored custom topics
+  customTopics.forEach(t => renderCustomTopicChip(t));
+
+  // 3. Open add topic input
+  openAddBtn?.addEventListener('click', () => {
+    if (!addBox) return;
+    const isHidden = addBox.style.display === 'none' || !addBox.style.display;
+    addBox.style.display = isHidden ? 'flex' : 'none';
+    if (isHidden && newTopicInput) {
+      newTopicInput.focus();
+    }
+  });
+
+  // 4. Cancel add topic
+  cancelTopicBtn?.addEventListener('click', () => {
+    if (addBox) addBox.style.display = 'none';
+    if (newTopicInput) newTopicInput.value = '';
+  });
+
+  // 5. Save Topic Action via Tick Button (✓) or Enter
+  function saveNewTopic() {
+    if (!newTopicInput) return;
+    const val = newTopicInput.value.trim();
+    if (!val) {
+      showToast('⚠️ Please enter a topic name');
+      return;
+    }
+
+    if (!customTopics.includes(val)) {
+      customTopics.push(val);
+      localStorage.setItem('booknest_custom_topics', JSON.stringify(customTopics));
+    }
+
+    const newChip = renderCustomTopicChip(val);
+    if (newChip) {
+      newChip.click(); // Select and filter immediately!
+    }
+
+    newTopicInput.value = '';
+    if (addBox) addBox.style.display = 'none';
+    showToast(`✓ Topic '${val}' saved and selected!`);
+  }
+
+  saveTickBtn?.addEventListener('click', saveNewTopic);
+  newTopicInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveNewTopic();
+    } else if (e.key === 'Escape') {
+      if (addBox) addBox.style.display = 'none';
+    }
   });
 
   // Secondary status filter buttons
@@ -664,10 +778,15 @@ function filterLibrary() {
 
     // 2. Category Filter
     let matchesCat = true;
-    if (currentCategoryFilter !== 'ALL') {
+    if (currentCategoryFilter && currentCategoryFilter.toUpperCase() !== 'ALL') {
       const bCat = (b.genre || '').toLowerCase();
-      const targetCat = currentCategoryFilter.toLowerCase();
-      matchesCat = bCat.includes(targetCat.split(' ')[0]);
+      const targetCat = currentCategoryFilter.toLowerCase().trim();
+      const firstWord = targetCat.split(/\s+/)[0];
+      matchesCat = bCat.includes(targetCat) || 
+                   bCat.includes(firstWord) || 
+                   targetCat.includes(bCat) ||
+                   (b.title && b.title.toLowerCase().includes(firstWord)) ||
+                   (b.overview && b.overview.toLowerCase().includes(firstWord));
     }
 
     // 3. Status Filter
@@ -913,7 +1032,7 @@ function triggerConfettiCelebration(bookTitle) {
       colors: ['#6366f1', '#10b981', '#06b6d4', '#f59e0b', '#ec4899']
     });
   }
-  showToast(`🎉 வாழ்த்துகள்! '${bookTitle}' படிச்சு முடிச்சிட்டீங்க!`);
+  showToast(`🎉 Congratulations! You completed '${bookTitle}'!`);
 }
 
 // =========================================================
@@ -939,9 +1058,9 @@ function openChatForBook(book) {
     <div class="msg-row ai">
       <div class="msg-avatar avatar-ai">AI</div>
       <div class="msg-bubble">
-        வணக்கம்! நான் உங்கள் <strong>BookNest AI</strong> கதை உதவியாளர். 
+        Hello! I am your <strong>BookNest AI</strong> reading companion.
         <br><br>
-        <strong>'${book.title}'</strong> புத்தகத்தின் பின்னணி, கதைச் சுருக்கம் (scenario & story) அல்லது முக்கியமான கருத்துக்களை தமிழில் அல்லது ஆங்கிலத்தில் கேட்கலாம்!
+        Ask me anything about the background, scenario, storyline, or key life takeaways from <strong>'${escapeHtml(book.title)}'</strong>!
       </div>
     </div>
   `;
