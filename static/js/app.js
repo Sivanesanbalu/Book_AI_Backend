@@ -1396,18 +1396,17 @@ function initAiBot() {
     }
   }
 
-  // Movable / Draggable AI Bot
+  // Movable / Draggable AI Bot (Touch & Mouse with Pointer Capture)
   if (wrapper && botBtn) {
     let isDragging = false;
     let startX = 0, startY = 0;
     let initialLeft = 0, initialTop = 0;
     let hasMoved = false;
-    const dragThreshold = 6;
+    const dragThreshold = 5;
 
-    function onPointerDown(e) {
-      const pointer = e.touches ? e.touches[0] : e;
-      startX = pointer.clientX;
-      startY = pointer.clientY;
+    botBtn.addEventListener('pointerdown', (e) => {
+      startX = e.clientX;
+      startY = e.clientY;
 
       const rect = wrapper.getBoundingClientRect();
       initialLeft = rect.left;
@@ -1421,17 +1420,15 @@ function initAiBot() {
       wrapper.style.bottom = 'auto';
       wrapper.style.transition = 'none';
 
-      document.addEventListener('mousemove', onPointerMove, { passive: false });
-      document.addEventListener('mouseup', onPointerUp);
-      document.addEventListener('touchmove', onPointerMove, { passive: false });
-      document.addEventListener('touchend', onPointerUp);
-    }
+      try {
+        botBtn.setPointerCapture(e.pointerId);
+      } catch (err) {}
+    });
 
-    function onPointerMove(e) {
+    botBtn.addEventListener('pointermove', (e) => {
       if (!isDragging) return;
-      const pointer = e.touches ? e.touches[0] : e;
-      const dx = pointer.clientX - startX;
-      const dy = pointer.clientY - startY;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
 
       if (!hasMoved && Math.hypot(dx, dy) > dragThreshold) {
         hasMoved = true;
@@ -1440,7 +1437,6 @@ function initAiBot() {
       }
 
       if (hasMoved) {
-        if (e.cancelable) e.preventDefault();
         const newX = initialLeft + dx;
         const newY = initialTop + dy;
 
@@ -1453,17 +1449,16 @@ function initAiBot() {
         wrapper.style.left = `${clampedX}px`;
         wrapper.style.top = `${clampedY}px`;
       }
-    }
+    });
 
-    function onPointerUp(e) {
+    function endDrag(e) {
       if (!isDragging) return;
       isDragging = false;
       botBtn.classList.remove('dragging');
 
-      document.removeEventListener('mousemove', onPointerMove);
-      document.removeEventListener('mouseup', onPointerUp);
-      document.removeEventListener('touchmove', onPointerMove);
-      document.removeEventListener('touchend', onPointerUp);
+      try {
+        botBtn.releasePointerCapture(e.pointerId);
+      } catch (err) {}
 
       if (hasMoved) {
         const rect = wrapper.getBoundingClientRect();
@@ -1488,8 +1483,8 @@ function initAiBot() {
       }
     }
 
-    botBtn.addEventListener('mousedown', onPointerDown);
-    botBtn.addEventListener('touchstart', onPointerDown, { passive: true });
+    botBtn.addEventListener('pointerup', endDrag);
+    botBtn.addEventListener('pointercancel', endDrag);
   }
 
   if (bubble) {
