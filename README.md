@@ -7,7 +7,7 @@ An intelligent, mobile-first book scanner and personal library manager with 1,00
 ## 🔗 Live Access & Downloads
 
 - 💻 **Desktop Web App**: [http://localhost:8000](http://localhost:8000)
-- 📱 **Mobile Phone Web (HTTPS)**: [https://totals-poker-farmers-income.trycloudflare.com](https://totals-poker-farmers-income.trycloudflare.com)
+- 📱 **Mobile Phone Web (HTTPS)**: [https://fun-equality-becomes-typical.trycloudflare.com](https://fun-equality-becomes-typical.trycloudflare.com)
 - 📥 **Android Release APK**: [Download BookNest AI APK (v1.0.0)](https://github.com/Sivanesanbalu/Book_AI_Backend/releases/download/v1.0.0/BookNestAI-release.apk)
 
 ---
