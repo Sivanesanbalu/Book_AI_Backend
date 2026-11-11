@@ -32,6 +32,11 @@ Explore and filter a curated master catalog of **1,005 books**:
 - 📜 **History & Bio**: Sapiens, Steve Jobs, Wings of Fire, Ponniyin Selvan
 - 💼 **Business & Finance**: Zero to One, Psychology of Money, The Intelligent Investor
 
+### 3. ➕ Custom Topic & Category Creator
+- Click the **`+ Add Topic`** button in the category bar to type any personalized genre or study topic.
+- Tap the **`✓` (Save)** button or hit Enter to immediately save and filter books by your custom topic.
+- Custom categories persist across sessions and automatically populate all book assignment dropdowns.
+
 ### 3. ⚪ Clean White 3D Luxury Design
 - Modern porcelain white glassmorphic aesthetic with 3D card depth.
 - Physical 3D book cover tilt with spine depth and lighting highlights.
@@ -43,14 +48,14 @@ Explore and filter a curated master catalog of **1,005 books**:
 
 ### 5. 📖 3D Reading Tracker & Confetti Celebration
 - Tap any book to open its interactive 3D Reading Screen.
-- Manage status: `📖 Reading`, `🎉 Completed (படிச்சுட்டேன்)`, or `⭐ Wishlist`.
+- Manage status: `📖 Reading`, `🎉 Completed`, or `⭐ Wishlist`.
 - Give 1 to 5 star ratings.
 - **Confetti Cannon Animation**: Marking a book as "Completed" triggers a full-screen celebratory confetti burst!
 - Live metrics: Total Books, Completed Books, Reading Now, and 2026 Goal Progress.
 
-### 6. 💬 Bilingual Tamil & English AI Storyteller
+### 6. 💬 Intelligent AI Story Companion
 - Automatically generates atmospheric world setting, narrative hook, and key takeaways.
-- Interactive chat in **English** or **conversational Tamil (தமிழில் சுருக்கம்)**.
+- Interactive AI chat to discuss characters, plot twists, and life lessons from any book in your collection.
 
 ---
 
