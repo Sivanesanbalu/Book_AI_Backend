@@ -3367,12 +3367,11 @@ dialog::backdrop {
    ========================================================= */
 .floating-ai-wrapper {
   position: fixed;
-  bottom: calc(74px + var(--safe-bottom, 12px));
+  bottom: calc(76px + var(--safe-bottom, 12px));
   right: calc(50% - 240px + 16px);
+  width: 68px;
+  height: 68px;
   z-index: 95;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
   pointer-events: none;
   touch-action: none;
 }
@@ -3383,36 +3382,39 @@ dialog::backdrop {
   }
 }
 
-.floating-ai-wrapper.docked-left {
-  align-items: flex-start;
-}
-
-.floating-ai-wrapper.docked-left .speech-bubble-arrow {
-  right: auto;
-  left: 24px;
-}
-
 /* Floating Conversational Speech Bubble */
 .ai-speech-bubble {
   pointer-events: auto;
-  position: relative;
-  margin-bottom: 10px;
+  position: absolute;
+  bottom: 74px;
+  right: 0;
+  width: max-content;
+  max-width: 215px;
   background: var(--bg-surface);
   border: 1.5px solid rgba(99, 102, 241, 0.28);
   border-radius: 18px;
   padding: 8px 12px 8px 10px;
-  max-width: 220px;
   box-shadow: 0 10px 28px rgba(99, 102, 241, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   animation: speechBubbleFloat 3.8s ease-in-out infinite;
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.25s ease, transform 0.25s ease;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.floating-ai-wrapper.docked-left .ai-speech-bubble {
+  right: auto;
+  left: 0;
+}
+
+.floating-ai-wrapper.docked-left .speech-bubble-arrow {
+  right: auto;
+  left: 26px;
 }
 
 .ai-speech-bubble:active {
