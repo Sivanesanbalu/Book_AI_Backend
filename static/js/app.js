@@ -647,11 +647,15 @@ function updateDashboardStats(books) {
   if (countBadge) countBadge.textContent = `${total} Books`;
 }
 
+let displayedBookLimit = 24;
+let activeFilteredBooks = [];
+
 function filterLibrary() {
   const searchInput = document.getElementById('library-search');
   const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  displayedBookLimit = 24; // Reset to first page on search or filter change
 
-  let filtered = libraryBooks.filter(b => {
+  activeFilteredBooks = libraryBooks.filter(b => {
     // 1. Text Search Filter
     const matchesQuery = !query || 
       b.title.toLowerCase().includes(query) || 
@@ -679,7 +683,7 @@ function filterLibrary() {
     return matchesQuery && matchesCat && matchesStatus;
   });
 
-  renderLibrary(filtered);
+  renderLibrary(activeFilteredBooks);
 }
 
 function renderLibrary(books) {
@@ -699,7 +703,9 @@ function renderLibrary(books) {
     return;
   }
 
-  grid.innerHTML = books.map((b) => {
+  const visibleBooks = books.slice(0, displayedBookLimit);
+
+  const cardsHtml = visibleBooks.map((b) => {
     const isCompleted = (b.status || '').toLowerCase().includes('complet') || (b.status || '').toLowerCase().includes('finish');
     const isWishlist = (b.status || '').toLowerCase().includes('wish');
     const statusClass = isCompleted ? 'tag-completed' : (isWishlist ? 'tag-wishlist' : 'tag-reading');
@@ -708,7 +714,7 @@ function renderLibrary(books) {
     return `
       <div class="library-item 3d-card" onclick="openBookModal('${encodeURIComponent(b.title)}')">
         <div class="lib-cover-wrap">
-          <img src="${b.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=300&q=80'}" class="lib-cover" alt="cover">
+          <img src="${b.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=300&q=80'}" class="lib-cover" alt="cover" loading="lazy">
         </div>
         <div class="lib-meta">
           <div>
@@ -724,6 +730,24 @@ function renderLibrary(books) {
       </div>
     `;
   }).join('');
+
+  let loadMoreHtml = '';
+  if (books.length > displayedBookLimit) {
+    loadMoreHtml = `
+      <div style="grid-column: 1 / -1; text-align: center; margin: 18px 0 10px;">
+        <button id="load-more-books-btn" class="btn-secondary 3d-btn-secondary" style="width: 100%; padding: 14px 20px; font-weight: 800; font-size: 0.9rem;" onclick="loadMoreBooks()">
+          📖 Load More Books (+24) • Showing ${displayedBookLimit} of ${books.length} Books
+        </button>
+      </div>
+    `;
+  }
+
+  grid.innerHTML = cardsHtml + loadMoreHtml;
+}
+
+function loadMoreBooks() {
+  displayedBookLimit += 24;
+  renderLibrary(activeFilteredBooks);
 }
 
 // =========================================================

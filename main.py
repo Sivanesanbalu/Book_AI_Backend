@@ -114,13 +114,14 @@ def manifest():
 
 @app.get("/download")
 @app.get("/BookNestAI.apk")
+@app.get("/BookNestAI-release.apk")
 def download_apk():
-    apk_path = "static/BookNestAI.apk"
+    apk_path = "static/BookNestAI-release.apk" if os.path.exists("static/BookNestAI-release.apk") else "static/BookNestAI.apk"
     if os.path.exists(apk_path):
         return FileResponse(
             apk_path,
             media_type="application/vnd.android.package-archive",
-            filename="BookNestAI.apk"
+            filename="BookNestAI-release.apk"
         )
     return JSONResponse(status_code=404, content={"error": "APK not found"})
 
