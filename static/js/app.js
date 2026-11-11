@@ -1797,6 +1797,52 @@ const READING_QUOTES = [
   { quote: '"Think before you speak. Read before you think."', author: 'Fran Lebowitz' }
 ];
 
+function initMetricsCarousel() {
+  const carousel = document.getElementById('dash-metrics-carousel');
+  const dots = document.querySelectorAll('#metrics-dots-container .carousel-dot');
+  if (!carousel || dots.length === 0) return;
+
+  // Dot click to smooth scroll to specific card
+  dots.forEach((dot, idx) => {
+    dot.onclick = (e) => {
+      e.stopPropagation();
+      const cards = carousel.querySelectorAll('.metric-carousel-card');
+      if (cards[idx]) {
+        cards[idx].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    };
+  });
+
+  // Attach scroll spy once to update active dot smoothly
+  if (!carousel._hasScrollSpy) {
+    carousel._hasScrollSpy = true;
+    let ticking = false;
+    carousel.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const cards = carousel.querySelectorAll('.metric-carousel-card');
+          const containerCenter = carousel.scrollLeft + (carousel.clientWidth / 2);
+          let closestIdx = 0;
+          let minDiff = Infinity;
+          cards.forEach((card, idx) => {
+            const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
+            const diff = Math.abs(containerCenter - cardCenter);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIdx = idx;
+            }
+          });
+          dots.forEach((d, i) => {
+            d.classList.toggle('active', i === closestIdx);
+          });
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+  }
+}
+
 function initDashboardEvents() {
   document.getElementById('quick-start-reminder-btn')?.addEventListener('click', () => {
     switchToTab('tab-timer');
@@ -1878,6 +1924,15 @@ function updateDashboardView() {
   if (dGoalPct) dGoalPct.textContent = `${goalPct}%`;
   if (dGoalFill) dGoalFill.style.width = `${goalPct}%`;
   if (dGoalSub) dGoalSub.textContent = `${completed} of ${goal} Books Completed`;
+
+  const miniGoalFill = document.getElementById('mcard-goal-mini-fill');
+  if (miniGoalFill) miniGoalFill.style.width = `${goalPct}%`;
+
+  const streakBadge = document.getElementById('mcard-streak-badge');
+  const streakDays = localStorage.getItem('booknest_streak') || '5';
+  if (streakBadge) streakBadge.textContent = `${streakDays} Day Streak 🔥`;
+
+  initMetricsCarousel();
 
   // Find Active Reading Book
   const activeBook = libraryBooks.find(b => (b.status || '').toLowerCase() === 'reading') || libraryBooks[0];

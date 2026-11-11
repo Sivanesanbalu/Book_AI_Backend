@@ -79,27 +79,81 @@
         </button>
       </div>
 
-      <!-- Quick Metrics Grid (3D Porcelain Cards) -->
-      <div class="dash-metrics-grid">
-        <div class="dash-metric-card 3d-card">
-          <div class="dm-icon dm-books">📚</div>
-          <div class="dm-val" id="dash-total-books">0</div>
-          <div class="dm-label">In Library</div>
+      <!-- Quick Highlights Carousel (4 Animated Swipe Cards with Pagination Dots) -->
+      <div class="metrics-carousel-wrap">
+        <div id="dash-metrics-carousel" class="metrics-carousel-row">
+          
+          <!-- Card 1: Books in Library -->
+          <div class="metric-carousel-card 3d-card" id="mcard-library" onclick="switchToTab('tab-library')">
+            <div class="mcard-top">
+              <div class="mcard-icon-wrap icon-purple">
+                <span class="mcard-icon anim-bounce">📚</span>
+              </div>
+              <span class="mcard-badge badge-purple">Collection</span>
+            </div>
+            <div class="mcard-body">
+              <div class="mcard-val" id="dash-total-books">0</div>
+              <div class="mcard-title">Total Books Saved</div>
+              <div class="mcard-sub">Tap to browse full catalog ➔</div>
+            </div>
+          </div>
+
+          <!-- Card 2: Currently Reading & Streak -->
+          <div class="metric-carousel-card 3d-card" id="mcard-reading" onclick="switchToTab('tab-timer')">
+            <div class="mcard-top">
+              <div class="mcard-icon-wrap icon-orange">
+                <span class="mcard-icon anim-flame">🔥</span>
+              </div>
+              <span class="mcard-badge badge-orange" id="mcard-streak-badge">Active Streak</span>
+            </div>
+            <div class="mcard-body">
+              <div class="mcard-val" id="dash-reading-books">0</div>
+              <div class="mcard-title">Books Reading Now</div>
+              <div class="mcard-sub" id="mcard-streak-sub">Keep daily reading alive ⚡</div>
+            </div>
+          </div>
+
+          <!-- Card 3: Completed & Goal Progress -->
+          <div class="metric-carousel-card 3d-card" id="mcard-completed" onclick="switchToTab('tab-profile')">
+            <div class="mcard-top">
+              <div class="mcard-icon-wrap icon-green">
+                <span class="mcard-icon anim-trophy">🎉</span>
+              </div>
+              <span class="mcard-badge badge-green" id="dash-goal-pct">0%</span>
+            </div>
+            <div class="mcard-body">
+              <div class="mcard-val" id="dash-completed-books">0</div>
+              <div class="mcard-title">Books Completed</div>
+              <div class="mcard-mini-bar">
+                <div class="mcard-mini-fill" id="mcard-goal-mini-fill" style="width: 0%;"></div>
+              </div>
+              <div class="mcard-sub" id="dash-goal-sub">0 of 25 Books Completed</div>
+            </div>
+          </div>
+
+          <!-- Card 4: Total Time Read -->
+          <div class="metric-carousel-card 3d-card" id="mcard-time" onclick="switchToTab('tab-timer')">
+            <div class="mcard-top">
+              <div class="mcard-icon-wrap icon-blue">
+                <span class="mcard-icon anim-clock">⏱️</span>
+              </div>
+              <span class="mcard-badge badge-blue">Focus Mind</span>
+            </div>
+            <div class="mcard-body">
+              <div class="mcard-val" id="dash-reading-mins">0m</div>
+              <div class="mcard-title">Total Reading Time</div>
+              <div class="mcard-sub">Start Reading Stopwatch ➔</div>
+            </div>
+          </div>
+
         </div>
-        <div class="dash-metric-card 3d-card">
-          <div class="dm-icon dm-reading">📖</div>
-          <div class="dm-val" id="dash-reading-books">0</div>
-          <div class="dm-label">Reading Now</div>
-        </div>
-        <div class="dash-metric-card 3d-card">
-          <div class="dm-icon dm-completed">🎉</div>
-          <div class="dm-val" id="dash-completed-books">0</div>
-          <div class="dm-label">Completed</div>
-        </div>
-        <div class="dash-metric-card 3d-card">
-          <div class="dm-icon dm-time">⏱️</div>
-          <div class="dm-val" id="dash-reading-mins">0m</div>
-          <div class="dm-label">Time Read</div>
+
+        <!-- Carousel Pagination Dots (4 Dots) -->
+        <div id="metrics-dots-container" class="metrics-carousel-dots">
+          <span class="carousel-dot active" data-metric-idx="0" title="Total Books"></span>
+          <span class="carousel-dot" data-metric-idx="1" title="Reading Now"></span>
+          <span class="carousel-dot" data-metric-idx="2" title="Completed"></span>
+          <span class="carousel-dot" data-metric-idx="3" title="Time Read"></span>
         </div>
       </div>
 

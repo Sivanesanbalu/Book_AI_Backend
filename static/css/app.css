@@ -2801,49 +2801,213 @@ dialog::backdrop {
   transform: translateY(-2px);
 }
 
-/* Dashboard Metrics 4-Grid */
-.dash-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+/* Dashboard Metrics Carousel (4 Swipeable Animated Cards with Dots) */
+.metrics-carousel-wrap {
   margin-bottom: 16px;
+  position: relative;
 }
 
-@media (max-width: 480px) {
-  .dash-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+.metrics-carousel-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 4px 8px 4px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+
+.metrics-carousel-row::-webkit-scrollbar {
+  display: none;
+}
+
+.metric-carousel-card {
+  flex: 0 0 76%;
+  max-width: 285px;
+  scroll-snap-align: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: 20px;
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 148px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 600px) {
+  .metric-carousel-card {
+    flex: 0 0 240px;
+    max-width: 240px;
   }
 }
 
-.dash-metric-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 18px;
-  padding: 14px 12px;
-  text-align: center;
+.metric-carousel-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: var(--shadow-md);
+}
+
+.metric-carousel-card:active {
+  transform: scale(0.98);
+}
+
+.mcard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.mcard-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.icon-purple {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.icon-orange {
+  background: rgba(249, 115, 22, 0.12);
+}
+
+.icon-green {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.icon-blue {
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.mcard-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 12px;
+  letter-spacing: 0.2px;
+}
+
+.badge-purple {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+}
+
+.badge-orange {
+  background: rgba(249, 115, 22, 0.12);
+  color: #ea580c;
+}
+
+.badge-green {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.badge-blue {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+}
+
+.mcard-body {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
-.dm-icon {
-  font-size: 1.3rem;
-  margin-bottom: 2px;
-}
-
-.dm-val {
-  font-size: 1.25rem;
-  font-weight: 800;
+.mcard-val {
+  font-size: 1.7rem;
+  font-weight: 900;
   color: var(--text-main);
   line-height: 1.1;
+  letter-spacing: -0.5px;
 }
 
-.dm-label {
-  font-size: 0.72rem;
-  color: var(--text-muted);
+.mcard-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 2px;
+}
+
+.mcard-sub {
+  font-size: 0.73rem;
   font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.mcard-mini-bar {
+  width: 100%;
+  height: 5px;
+  background: var(--bg-body);
+  border-radius: 999px;
+  margin: 6px 0 2px 0;
+  overflow: hidden;
+}
+
+.mcard-mini-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #10b981, #059669);
+  transition: width 0.5s ease;
+}
+
+/* Animations for icons */
+@keyframes floatBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.anim-bounce {
+  display: inline-block;
+  animation: floatBounce 2.8s ease-in-out infinite;
+}
+
+@keyframes flameFlicker {
+  0%, 100% { transform: scale(1) rotate(-2deg); filter: drop-shadow(0 0 3px rgba(249, 115, 22, 0.4)); }
+  50% { transform: scale(1.15) rotate(3deg); filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.8)); }
+}
+.anim-flame {
+  display: inline-block;
+  animation: flameFlicker 2s ease-in-out infinite;
+}
+
+@keyframes trophyPop {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.16) rotate(6deg); filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6)); }
+}
+.anim-trophy {
+  display: inline-block;
+  animation: trophyPop 3s ease-in-out infinite;
+}
+
+@keyframes clockTick {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(8deg); }
+  75% { transform: rotate(-8deg); }
+}
+.anim-clock {
+  display: inline-block;
+  animation: clockTick 2.2s ease-in-out infinite;
+}
+
+/* Metrics Carousel Dots */
+.metrics-carousel-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0 2px;
+  width: 100%;
 }
 
 /* Dashboard Goal Card */
