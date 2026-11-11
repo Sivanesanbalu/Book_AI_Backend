@@ -191,8 +191,9 @@ function loadStoredUser() {
 }
 
 function checkFirstTimeUser() {
-  const isAuth = localStorage.getItem('booknest_user_authenticated');
-  if (!isAuth) {
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+  const isDismissed = localStorage.getItem('booknest_auth_modal_dismissed') === 'true';
+  if (!isAuth && !isDismissed) {
     setTimeout(() => {
       if (authModal && !authModal.open) {
         authModal.showModal();
@@ -202,6 +203,7 @@ function checkFirstTimeUser() {
 }
 
 function updateUserUI() {
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
   const headerAvatar = document.getElementById('header-avatar');
   const headerName = document.getElementById('header-user-name');
   const profileAvatar = document.getElementById('profile-avatar-img');
@@ -209,32 +211,73 @@ function updateUserUI() {
   const profileEmail = document.getElementById('profile-email');
   const editName = document.getElementById('edit-profile-name');
   const editGoal = document.getElementById('edit-reading-goal');
+  const googleLoginBtn = document.getElementById('google-login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
 
   if (headerAvatar) headerAvatar.src = currentUser.avatar;
-  if (headerName) headerName.textContent = currentUser.name.split(' ')[0] || 'Reader';
   if (profileAvatar) profileAvatar.src = currentUser.avatar;
   if (profileName) profileName.textContent = currentUser.name;
   if (profileEmail) profileEmail.textContent = currentUser.email;
   if (editName) editName.value = currentUser.name;
   if (editGoal) editGoal.value = currentUser.reading_goal || 25;
+
+  if (isAuth) {
+    // Once logged in: Show ONLY the logout button, NO sign in button!
+    if (headerName) headerName.textContent = currentUser.name.split(' ')[0] || 'Profile';
+    if (googleLoginBtn) googleLoginBtn.style.display = 'none';
+    if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+  } else {
+    // When logged out: Show sign in button, hide logout button
+    if (headerName) headerName.textContent = 'Sign In';
+    if (googleLoginBtn) googleLoginBtn.style.display = 'inline-flex';
+    if (logoutBtn) logoutBtn.style.display = 'none';
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem('booknest_user_authenticated');
+  currentUser = {
+    uid: 'guest_' + Math.random().toString(36).substring(2, 9),
+    name: 'Reader',
+    email: 'reader@booknest.local',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80',
+    reading_goal: 25
+  };
+  localStorage.setItem('booknest_user', JSON.stringify(currentUser));
+  updateUserUI();
+  showToast('👋 You have been logged out.');
+  loadLibrary();
+  loadProfile();
 }
 
 function initAuthUI() {
   const authHeaderBtn = document.getElementById('auth-header-btn');
   const googleLoginBtn = document.getElementById('google-login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
   const instantGoogleBtn = document.getElementById('instant-google-btn');
   const quickGoogleUserBtn = document.getElementById('google-quick-user-btn');
   const closeAuthModal = document.getElementById('close-auth-modal');
   const changeAvatarBtn = document.getElementById('change-avatar-btn');
   const uploadCustomAvatarBtn = document.getElementById('upload-custom-avatar-btn');
 
-  // Open Auth Modal
-  authHeaderBtn?.addEventListener('click', () => authModal.showModal());
+  // Open Auth Modal or Jump to Profile if already logged in
+  authHeaderBtn?.addEventListener('click', () => {
+    const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+    if (isAuth) {
+      switchToTab('tab-profile');
+    } else {
+      authModal.showModal();
+    }
+  });
+
   googleLoginBtn?.addEventListener('click', () => authModal.showModal());
 
-  // Close Auth Modal (mark as acknowledged so it won't re-pop)
+  // Logout Button click listener
+  logoutBtn?.addEventListener('click', handleLogout);
+
+  // Close Auth Modal
   closeAuthModal?.addEventListener('click', () => {
-    localStorage.setItem('booknest_user_authenticated', 'true');
+    localStorage.setItem('booknest_auth_modal_dismissed', 'true');
     authModal.close();
   });
 
