@@ -195,14 +195,14 @@ async def scan(request: Request, file: UploadFile = File(...)):
         if not title:
             return {"status": "not_found"}
 
-        # Generate scenario synopsis for the book
-        book_dict = {
-            "title": title,
-            "authors": author or "Unknown Author",
-            "description": overview or "",
-            "genre": genre
+        # Instant scenario generation (no slow blocking LLM call during scan)
+        scenario = {
+            "scenario": f"Set in the world of {genre}, '{title}' by {author or 'Unknown Author'} unfolds an unforgettable story.",
+            "genre_type": genre,
+            "story_narrative": (overview[:280] + "...") if overview and len(overview) > 280 else (overview or f"A celebrated {genre} work by {author or 'Author Unknown'}."),
+            "key_takeaway": "Reading expands our horizons and offers timeless insights into life.",
+            "vibe": f"Mindful • {genre.split()[0] if genre else 'Books'} • Acclaimed"
         }
-        scenario = generate_book_scenario(book_dict)
 
         # Check if user already owns this book in their personal database
         is_owned = user_has_book(uid, title)

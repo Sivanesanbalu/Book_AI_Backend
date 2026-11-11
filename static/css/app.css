@@ -3165,3 +3165,292 @@ dialog::backdrop {
   background: var(--accent-primary);
   color: #fff;
 }
+
+/* =========================================================
+   🤖 FLOATING AI BOT (LOTTIE FAB IN BOTTOM RIGHT)
+   ========================================================= */
+.floating-ai-fab {
+  position: fixed;
+  bottom: calc(76px + var(--safe-bottom, 12px));
+  right: 18px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 26px rgba(99, 102, 241, 0.35), 0 4px 10px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+  animation: fabFloatBob 3.5s ease-in-out infinite;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.floating-ai-fab:active {
+  transform: scale(0.9) !important;
+}
+
+.floating-ai-fab:hover {
+  transform: translateY(-4px) scale(1.06);
+  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.45), 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes fabFloatBob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.fab-bot-pulse {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-primary);
+  opacity: 0;
+  pointer-events: none;
+  animation: fabPulseRing 2.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+@keyframes fabPulseRing {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  60% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+.fab-lottie-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.fab-fallback-icon {
+  font-size: 1.8rem;
+  display: none; /* Shown if lottie fails */
+}
+
+.fab-badge-glow {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.5);
+  letter-spacing: 0.5px;
+  border: 1.5px solid #fff;
+}
+
+/* =========================================================
+   ⏱️ QUICK PAGE STEPPERS & TIMER PRESET ENHANCEMENTS
+   ========================================================= */
+.quick-page-stepper-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.stepper-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.stepper-buttons-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-step-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 5px 11px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  outline: none;
+}
+
+.page-step-btn:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.page-step-btn:active {
+  transform: scale(0.92);
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.live-pages-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 3px 8px;
+  border-radius: 12px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   👤 LUXURY PROFILE & READING GOAL CARD
+   ========================================================= */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+}
+
+@media (max-width: 440px) {
+  .profile-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.highlight-orange .stat-val {
+  color: #f59e0b;
+}
+
+.highlight-blue .stat-val {
+  color: #3b82f6;
+}
+
+.goal-progress-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.goal-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.goal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: var(--text-main);
+}
+
+.goal-fraction {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--accent-primary);
+}
+
+.goal-bar-track {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+[data-theme="dark"] .goal-bar-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.goal-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #10b981);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.goal-stepper-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.goal-stepper-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepper-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-weight: 800;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.stepper-btn:hover {
+  border-color: var(--accent-primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.stepper-btn:active {
+  transform: scale(0.92);
+}
+
+.goal-input {
+  width: 60px;
+  text-align: center;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-main);
+  padding: 5px;
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+

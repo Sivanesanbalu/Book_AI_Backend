@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="/static/css/app.css">
   <!-- Lightweight Confetti for book completion celebration -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <!-- Lottie Player for Animated AI Bot -->
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
   <!-- Google Identity Services for Google Login -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -214,7 +216,7 @@
       <div class="scanner-viewport fullscreen-viewport">
         <video id="camera-video" autoplay playsinline muted></video>
 
-        <!-- Top Floating Overlay Controls: Flash & Google Lens AI Badge -->
+        <!-- Top Floating Overlay Controls: Flash & AI Scanner Badge -->
         <div class="cam-overlay-top">
           <button class="cam-glass-btn" id="flash-toggle-btn" title="Toggle Flash / Torch">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
@@ -223,11 +225,11 @@
 
           <div class="cam-status-pill lens-pill">
             <span class="lens-glow-dot"></span>
-            <span>Google Lens AI</span>
+            <span>AI Scanner</span>
           </div>
         </div>
 
-        <!-- Google Lens Animated Scanning Frame -->
+        <!-- Animated Scanning Frame -->
         <div class="lens-frame">
           <div class="lens-corner lens-tl"></div>
           <div class="lens-corner lens-tr"></div>
@@ -240,7 +242,7 @@
           <span>Align book cover inside frame</span>
         </div>
 
-        <!-- Bottom Floating Controls: Gallery, Lens Shutter, Single Flip -->
+        <!-- Bottom Floating Controls: Gallery, Shutter, Single Flip -->
         <div class="cam-overlay-bottom">
           <button class="cam-control-icon-btn lens-control-btn" id="upload-btn" title="Choose from Photo Gallery">
             <div class="cam-icon-circle">
@@ -250,7 +252,7 @@
           </button>
           <input type="file" id="photo-input" accept="image/*" style="display: none;">
 
-          <button class="shutter-btn lens-shutter 3d-shutter" id="shutter-btn" title="Capture & Scan with Google Lens">
+          <button class="shutter-btn lens-shutter 3d-shutter" id="shutter-btn" title="Capture & Scan Cover">
             <div class="shutter-inner lens-inner">
               <svg viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
@@ -485,13 +487,13 @@
 
         <!-- Preset Session Buttons -->
         <div class="timer-presets">
-          <button type="button" class="preset-btn" data-minutes="15">15 Min</button>
-          <button type="button" class="preset-btn active" data-minutes="25">25 Min (Pomodoro)</button>
-          <button type="button" class="preset-btn" data-minutes="45">45 Min</button>
-          <button type="button" class="preset-btn" data-minutes="0">Open Stopwatch</button>
+          <button type="button" class="preset-btn active" data-minutes="0">⏱️ Start at 0 (Free)</button>
+          <button type="button" class="preset-btn" data-minutes="10">10 Min</button>
+          <button type="button" class="preset-btn" data-minutes="30">30 Min</button>
+          <button type="button" class="preset-btn" data-minutes="60">1 Hour</button>
         </div>
 
-        <!-- Page Number Inputs -->
+        <!-- Page Number Inputs & Live Quick Steppers -->
         <div class="page-log-card">
           <div class="page-inputs-row">
             <div class="page-input-group">
@@ -507,6 +509,18 @@
               <label class="field-micro-label">Total Book Pages:</label>
               <input type="number" id="timer-total-pages" class="page-input" placeholder="e.g. 300" min="1" value="300">
             </div>
+          </div>
+
+          <!-- Quick 1-Tap Page Increment Steppers -->
+          <div class="quick-page-stepper-row">
+            <span class="stepper-label">Quick Page Stepper:</span>
+            <div class="stepper-buttons-wrap">
+              <button type="button" class="page-step-btn" data-step="1">+1p</button>
+              <button type="button" class="page-step-btn" data-step="5">+5p</button>
+              <button type="button" class="page-step-btn" data-step="10">+10p</button>
+              <button type="button" class="page-step-btn" data-step="25">+25p</button>
+            </div>
+            <span id="timer-live-pages-read" class="live-pages-badge">+0 pages read</span>
           </div>
         </div>
 
@@ -602,34 +616,52 @@
           </div>
         </div>
         
-        <div class="stats-row">
-          <div class="stat-item">
+        <div class="stats-row profile-stats-grid">
+          <div class="stat-item 3d-card">
             <div id="stat-total-books" class="stat-val">0</div>
-            <div class="stat-label">In Library</div>
+            <div class="stat-label">📚 In Library</div>
           </div>
-          <div class="stat-item highlight-green">
+          <div class="stat-item 3d-card highlight-green">
             <div id="stat-completed-books" class="stat-val">0</div>
-            <div class="stat-label">Completed</div>
+            <div class="stat-label">🎉 Completed</div>
           </div>
-          <div class="stat-item">
-            <div id="stat-total-scans" class="stat-val">0</div>
-            <div class="stat-label">AI Scans</div>
+          <div class="stat-item 3d-card highlight-orange">
+            <div id="stat-streak-days" class="stat-val">5</div>
+            <div class="stat-label">🔥 Day Streak</div>
           </div>
-          <div class="stat-item">
-            <div id="stat-goal" class="stat-val">0 / 25</div>
-            <div class="stat-label">2026 Goal</div>
+          <div class="stat-item 3d-card highlight-blue">
+            <div id="stat-reading-hours" class="stat-val">3.5h</div>
+            <div class="stat-label">⏱️ Read Time</div>
+          </div>
+        </div>
+
+        <!-- 2026 Reading Goal Progress & Quick Stepper -->
+        <div class="goal-progress-card 3d-card">
+          <div class="goal-header-row">
+            <div class="goal-title-wrap">
+              <span class="goal-icon">🎯</span>
+              <span class="goal-title">2026 Reading Goal</span>
+            </div>
+            <span id="stat-goal" class="goal-fraction">0 / 25</span>
+          </div>
+          <div class="goal-bar-track">
+            <div id="goal-progress-fill" class="goal-bar-fill" style="width: 0%;"></div>
+          </div>
+          <div class="goal-stepper-row">
+            <span class="field-micro-label">Quick Adjust Goal:</span>
+            <div class="goal-stepper-controls">
+              <button type="button" id="goal-minus-btn" class="stepper-btn">-5</button>
+              <input type="number" id="edit-reading-goal" class="goal-input" value="25" min="1" max="500">
+              <button type="button" id="goal-plus-btn" class="stepper-btn">+5</button>
+            </div>
           </div>
         </div>
 
         <!-- Edit Profile Form -->
-        <div class="profile-edit-box">
+        <div class="profile-edit-box 3d-card">
           <div class="form-row">
             <label class="field-micro-label">Your Name:</label>
             <input type="text" id="edit-profile-name" class="profile-input" placeholder="Enter your name">
-          </div>
-          <div class="form-row">
-            <label class="field-micro-label">2026 Reading Goal (Books to Read):</label>
-            <input type="number" id="edit-reading-goal" class="profile-input" placeholder="25" min="1" max="500">
           </div>
           <button id="save-profile-btn" class="btn-primary 3d-btn-primary" style="margin-top: 10px;">
             💾 Save Profile Settings
@@ -912,6 +944,25 @@
         <span>Profile</span>
       </a>
     </nav>
+
+    <!-- ==========================================
+         FLOATING AI BOT (LOTTIE ANIMATION FAB)
+         ========================================== -->
+    <button id="floating-ai-bot" class="floating-ai-fab" title="Chat with AI Book Bot" aria-label="Open AI Assistant">
+      <div class="fab-bot-pulse"></div>
+      <div class="fab-lottie-container">
+        <lottie-player 
+          src="https://assets3.lottiefiles.com/packages/lf20_tijbafky.json" 
+          background="transparent" 
+          speed="1" 
+          style="width: 52px; height: 52px;" 
+          loop 
+          autoplay>
+        </lottie-player>
+        <span class="fab-fallback-icon">🤖</span>
+      </div>
+      <span class="fab-badge-glow">AI</span>
+    </button>
 
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>

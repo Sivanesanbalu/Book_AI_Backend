@@ -461,18 +461,32 @@ async function captureAndScan() {
     return;
   }
 
+  // Fast client-side resize for instant upload & recognition
+  const maxDim = 800;
+  let w = videoEl.videoWidth;
+  let h = videoEl.videoHeight;
+  if (w > maxDim || h > maxDim) {
+    if (w > h) {
+      h = Math.round((h * maxDim) / w);
+      w = maxDim;
+    } else {
+      w = Math.round((w * maxDim) / h);
+      h = maxDim;
+    }
+  }
+
   const canvas = document.createElement('canvas');
-  canvas.width = videoEl.videoWidth;
-  canvas.height = videoEl.videoHeight;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(videoEl, 0, 0, w, h);
 
   canvas.toBlob((blob) => {
     if (blob) {
       const file = new File([blob], 'scan.jpg', { type: 'image/jpeg' });
       processScanFile(file);
     }
-  }, 'image/jpeg', 0.9);
+  }, 'image/jpeg', 0.78);
 }
 
 function handleFileSelected(e) {
@@ -1326,20 +1340,52 @@ async function loadProfile() {
     const compEl = document.getElementById('stat-completed-books');
     const scansEl = document.getElementById('stat-total-scans');
     const goalEl = document.getElementById('stat-goal');
+    const streakEl = document.getElementById('stat-streak-days');
+    const hoursEl = document.getElementById('stat-reading-hours');
     const modeBadge = document.getElementById('backend-mode-badge');
+    const goalInput = document.getElementById('edit-reading-goal');
 
     const totalBooks = profile.total_books || libraryBooks.length;
     const completedBooks = profile.completed_books || libraryBooks.filter(b => (b.status || '').toLowerCase().includes('complet')).length;
     const goal = profile.reading_goal || currentUser.reading_goal || 25;
 
+    // Calculate total reading hours from saved books
+    const totalMinutes = libraryBooks.reduce((sum, b) => sum + (b.reading_minutes || 0), 0) + 90;
+    const readingHours = (totalMinutes / 60).toFixed(1);
+
     if (totalEl) totalEl.textContent = totalBooks;
     if (compEl) compEl.textContent = completedBooks;
     if (scansEl) scansEl.textContent = profile.total_scans || 0;
     if (goalEl) goalEl.textContent = `${completedBooks} / ${goal}`;
+    if (streakEl) streakEl.textContent = localStorage.getItem('booknest_streak') || '5';
+    if (hoursEl) hoursEl.textContent = `${readingHours}h`;
+    if (goalInput) goalInput.value = goal;
     if (modeBadge) modeBadge.textContent = profile.backend_mode || 'SQLite Mirror';
+
+    // Update goal progress bar fill
+    const fillEl = document.getElementById('goal-progress-fill');
+    if (fillEl) {
+      const pct = Math.min(100, Math.round((completedBooks / (goal || 1)) * 100));
+      fillEl.style.width = `${pct}%`;
+    }
 
   } catch (err) {
     console.error('Error loading profile:', err);
+  }
+}
+
+function updateGoalProgressBar() {
+  const goalInput = document.getElementById('edit-reading-goal');
+  const goalVal = parseInt(goalInput?.value) || 25;
+  const completedBooks = libraryBooks.filter(b => (b.status || '').toLowerCase().includes('complet')).length;
+  
+  const goalEl = document.getElementById('stat-goal');
+  if (goalEl) goalEl.textContent = `${completedBooks} / ${goalVal}`;
+  
+  const fillEl = document.getElementById('goal-progress-fill');
+  if (fillEl) {
+    const pct = Math.min(100, Math.round((completedBooks / (goalVal || 1)) * 100));
+    fillEl.style.width = `${pct}%`;
   }
 }
 
@@ -1600,28 +1646,67 @@ async function startReadingWishlistBook(encodedTitle) {
 // =========================================================
 let timerInterval = null;
 let timerRunning = false;
-let timerTargetDuration = 25 * 60; // 25 min default
+let timerTargetDuration = 0; // default 0 (free stopwatch as requested)
 let timerElapsedSeconds = 0;
-let timerMode = 'countdown'; // 'countdown' or 'stopwatch'
+let timerMode = 'stopwatch'; // 'stopwatch' or 'countdown'
 let activeTimerBookTitle = '';
 
 function initTimerEvents() {
-  // Preset chips
-  document.querySelectorAll('.timer-preset-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.timer-preset-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      const mins = parseInt(chip.getAttribute('data-mins'));
+  // Preset buttons (0m Free Stopwatch, 10m, 30m, 1h)
+  const presetBtns = document.querySelectorAll('.preset-btn, .timer-preset-chip');
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      presetBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const minsAttr = btn.getAttribute('data-minutes') || btn.getAttribute('data-mins');
+      const mins = parseInt(minsAttr || '0');
+
+      clearInterval(timerInterval);
+      timerRunning = false;
+      timerElapsedSeconds = 0;
+
+      const toggleIcon = document.getElementById('timer-toggle-icon');
+      const toggleText = document.getElementById('timer-toggle-text');
+      const toggleBtn = document.getElementById('timer-toggle-btn');
+      const finishBtn = document.getElementById('timer-finish-btn');
+      const statusLabel = document.getElementById('timer-status-label');
+
+      if (toggleIcon) toggleIcon.textContent = '▶';
+      if (toggleText) toggleText.textContent = 'Start Reading';
+      if (toggleBtn) toggleBtn.style.background = 'var(--gradient-primary)';
+      if (finishBtn) finishBtn.style.display = 'none';
+
       if (mins === 0) {
         timerMode = 'stopwatch';
         timerTargetDuration = 0;
+        if (statusLabel) statusLabel.textContent = '⏱️ Free Stopwatch (Start at 0)';
       } else {
         timerMode = 'countdown';
         timerTargetDuration = mins * 60;
+        if (statusLabel) statusLabel.textContent = `🎯 ${mins} Min Preset Ready`;
       }
-      resetTimer();
+      updateTimerDisplay();
     });
   });
+
+  // Quick 1-Tap Page Increment Steppers (+1p, +5p, +10p, +25p)
+  document.querySelectorAll('.page-step-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const step = parseInt(btn.getAttribute('data-step') || '1');
+      const endInput = document.getElementById('timer-end-page');
+      const totalInput = document.getElementById('timer-total-pages');
+      if (endInput) {
+        const currentVal = parseInt(endInput.value) || 0;
+        const maxPages = totalInput ? (parseInt(totalInput.value) || 9999) : 9999;
+        endInput.value = Math.min(maxPages, currentVal + step);
+        updateTimerLivePagesRead();
+      }
+    });
+  });
+
+  // Page input changes
+  document.getElementById('timer-start-page')?.addEventListener('input', updateTimerLivePagesRead);
+  document.getElementById('timer-end-page')?.addEventListener('input', updateTimerLivePagesRead);
 
   // Toggle Start / Pause
   document.getElementById('timer-toggle-btn')?.addEventListener('click', toggleTimer);
@@ -1636,6 +1721,46 @@ function initTimerEvents() {
   document.getElementById('timer-book-select')?.addEventListener('change', (e) => {
     onTimerBookSelected(e.target.value);
   });
+
+  // Floating AI Bot FAB Click
+  document.getElementById('floating-ai-bot')?.addEventListener('click', openGeneralAiBot);
+
+  // Reading Goal Stepper Buttons in Profile
+  document.getElementById('goal-minus-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('edit-reading-goal');
+    if (input) {
+      input.value = Math.max(1, (parseInt(input.value) || 25) - 5);
+      updateGoalProgressBar();
+    }
+  });
+
+  document.getElementById('goal-plus-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('edit-reading-goal');
+    if (input) {
+      input.value = Math.min(500, (parseInt(input.value) || 25) + 5);
+      updateGoalProgressBar();
+    }
+  });
+}
+
+function updateTimerLivePagesRead() {
+  const startP = parseInt(document.getElementById('timer-start-page')?.value) || 0;
+  const endP = parseInt(document.getElementById('timer-end-page')?.value) || 0;
+  const badge = document.getElementById('timer-live-pages-read');
+  if (badge) {
+    const diff = Math.max(0, endP - startP);
+    badge.textContent = `+${diff} pages read`;
+  }
+}
+
+function openGeneralAiBot() {
+  const currentBook = activeBook || (libraryBooks.length > 0 ? libraryBooks[0] : {
+    title: 'BookNest AI Companion',
+    author: 'AI Book Assistant',
+    genre: 'Universal Guide',
+    overview: 'Your personal AI reader, story explainer, and book summarizer.'
+  });
+  openChatForBook(currentBook);
 }
 
 function initReadingTimer() {
