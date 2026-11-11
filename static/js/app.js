@@ -1240,7 +1240,7 @@ function triggerConfettiCelebration(bookTitle) {
 // =========================================================
 // 🤖 MINI CHATBOT & STORYTELLER DRAWER
 // =========================================================
-function openChatForBook(book) {
+function openChatForBook(book, isGeneral = false) {
   if (!book) return;
   activeBook = book;
   chatHistory = [];
@@ -1251,28 +1251,50 @@ function openChatForBook(book) {
   const messagesList = document.getElementById('chat-messages-list');
   const chatBackdrop = document.getElementById('chat-backdrop');
 
-  if (titleEl) titleEl.textContent = book.title;
-  if (tagEl) tagEl.textContent = book.genre || 'Fiction';
+  if (isGeneral) {
+    if (titleEl) titleEl.textContent = 'BookNest AI Companion';
+    if (tagEl) tagEl.textContent = 'Smart Reading Guide';
+    if (scenarioDesc) scenarioDesc.textContent = 'Ask me anything! I can recommend your next read, summarize any story, explain characters, or extract key life lessons.';
 
-  if (scenarioDesc) {
-    if (book.scenario && book.scenario.story_narrative) {
-      scenarioDesc.textContent = book.scenario.story_narrative;
-    } else {
-      scenarioDesc.textContent = book.overview || `A gripping narrative by ${book.author || 'Author'}. Tap below to discover the scenario, story, and takeaways!`;
-    }
-  }
-
-  if (messagesList) {
-    messagesList.innerHTML = `
-      <div class="msg-row ai">
-        <div class="msg-avatar avatar-ai">AI</div>
-        <div class="msg-bubble">
-          Hello! I am your <strong>BookNest AI</strong> reading companion.
-          <br><br>
-          Ask me anything about the background, scenario, storyline, or key life takeaways from <strong>'${escapeHtml(book.title)}'</strong>!
+    if (messagesList) {
+      messagesList.innerHTML = `
+        <div class="msg-row ai">
+          <div class="msg-avatar avatar-ai">AI</div>
+          <div class="msg-bubble">
+            Hello! I am your <strong>BookNest AI Companion</strong> 🤖.
+            <br><br>
+            What would you like to explore today?
+            <br>• <em>"What book should I read next based on my mood?"</em>
+            <br>• <em>"Explain the core message or summary of any book"</em>
+            <br>• Or ask any questions about reading, plots, and insights!
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
+  } else {
+    if (titleEl) titleEl.textContent = book.title;
+    if (tagEl) tagEl.textContent = book.genre || 'Fiction';
+
+    if (scenarioDesc) {
+      if (book.scenario && book.scenario.story_narrative) {
+        scenarioDesc.textContent = book.scenario.story_narrative;
+      } else {
+        scenarioDesc.textContent = book.overview || `A gripping narrative by ${book.author || 'Author'}. Tap below to discover the scenario, story, and takeaways!`;
+      }
+    }
+
+    if (messagesList) {
+      messagesList.innerHTML = `
+        <div class="msg-row ai">
+          <div class="msg-avatar avatar-ai">AI</div>
+          <div class="msg-bubble">
+            Hello! I am your <strong>BookNest AI</strong> reading companion.
+            <br><br>
+            Ask me anything about the background, scenario, storyline, or key life takeaways from <strong>'${escapeHtml(book.title)}'</strong>!
+          </div>
+        </div>
+      `;
+    }
   }
 
   if (chatDrawer) chatDrawer.classList.add('open');
@@ -1285,14 +1307,65 @@ function closeChatDrawer() {
   if (chatBackdrop) chatBackdrop.classList.remove('open');
 }
 
+const aiPrompts = [
+  "Hi! What do you want to read? Tap me! ✨",
+  "Need a great book recommendation? Ask me! 📚",
+  "Ask me about any book's plot & life lessons! 💡",
+  "Want a quick 2-minute story summary? Tap me! ⏱️",
+  "Looking for books on psychology, sci-fi or habits? 🎯"
+];
+let aiPromptIdx = 0;
+
+function dismissAiSpeechBubble() {
+  const bubble = document.getElementById('ai-bot-speech-bubble');
+  if (bubble) {
+    bubble.style.opacity = '0';
+    bubble.style.transform = 'translateY(6px) scale(0.92)';
+    setTimeout(() => {
+      bubble.style.display = 'none';
+    }, 280);
+  }
+}
+
 function initAiBot() {
   const fab = document.getElementById('floating-ai-bot');
   if (fab) {
-    fab.onclick = (e) => {
+    fab.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       openGeneralAiBot();
-    };
+    });
+    fab.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openGeneralAiBot();
+    });
+  }
+
+  const bubble = document.getElementById('ai-bot-speech-bubble');
+  if (bubble) {
+    bubble.addEventListener('click', (e) => {
+      if (e.target.id === 'close-speech-bubble') return;
+      e.preventDefault();
+      e.stopPropagation();
+      openGeneralAiBot();
+    });
+
+    // Rotate speech bubble prompts every 11s
+    setInterval(() => {
+      if (bubble.style.display !== 'none' && bubble.style.opacity !== '0') {
+        aiPromptIdx = (aiPromptIdx + 1) % aiPrompts.length;
+        const textEl = document.getElementById('ai-bubble-text');
+        if (textEl) {
+          textEl.style.transition = 'opacity 0.2s ease';
+          textEl.style.opacity = '0';
+          setTimeout(() => {
+            textEl.textContent = aiPrompts[aiPromptIdx];
+            textEl.style.opacity = '1';
+          }, 200);
+        }
+      }
+    }, 11000);
   }
 
   const closeBtn = document.getElementById('close-chat-btn');
@@ -1673,21 +1746,14 @@ function updateDashboardView() {
             <span class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot-idx="${i}"></span>
           `).join('');
 
-          // Click dot to smooth scroll
-          dotsContainer.querySelectorAll('.carousel-dot').forEach(dot => {
+          // Click dot to smooth scroll card into center
+          dotsContainer.querySelectorAll('.carousel-dot').forEach((dot, idx) => {
             dot.onclick = (e) => {
               e.stopPropagation();
-              const idx = parseInt(dot.getAttribute('data-dot-idx'));
-              const cardWidth = 167; // 155px card + 12px gap
-              wishContainer.scrollTo({
-                left: idx * cardWidth,
-                behavior: 'smooth'
-              });
-              const dots = dotsContainer.querySelectorAll('.carousel-dot');
-              dots.forEach((d, di) => {
-                if (di === idx) d.classList.add('active');
-                else d.classList.remove('active');
-              });
+              const cards = wishContainer.querySelectorAll('.wishlist-card');
+              if (cards[idx]) {
+                cards[idx].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+              }
             };
           });
         } else {
@@ -1698,16 +1764,33 @@ function updateDashboardView() {
       // Attach scroll listener once
       if (!wishContainer._hasScrollSpy) {
         wishContainer._hasScrollSpy = true;
+        let scrollTicking = false;
         wishContainer.addEventListener('scroll', () => {
-          const scrollLeft = wishContainer.scrollLeft;
-          const cardWidth = 167;
-          const dots = document.querySelectorAll('#wishlist-dots-container .carousel-dot');
-          if (dots.length > 0) {
-            const activeIdx = Math.min(dots.length - 1, Math.max(0, Math.round(scrollLeft / cardWidth)));
-            dots.forEach((d, i) => {
-              if (i === activeIdx) d.classList.add('active');
-              else d.classList.remove('active');
+          if (!scrollTicking) {
+            requestAnimationFrame(() => {
+              const dots = document.querySelectorAll('#wishlist-dots-container .carousel-dot');
+              const cards = wishContainer.querySelectorAll('.wishlist-card');
+              if (dots.length > 0 && cards.length > 0) {
+                const containerCenter = wishContainer.scrollLeft + (wishContainer.clientWidth / 2);
+                let closestIdx = 0;
+                let minDiff = Infinity;
+                cards.forEach((card, idx) => {
+                  const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
+                  const diff = Math.abs(containerCenter - cardCenter);
+                  if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = idx;
+                  }
+                });
+                const activeIdx = Math.min(dots.length - 1, closestIdx);
+                dots.forEach((d, i) => {
+                  if (i === activeIdx) d.classList.add('active');
+                  else d.classList.remove('active');
+                });
+              }
+              scrollTicking = false;
             });
+            scrollTicking = true;
           }
         }, { passive: true });
       }
@@ -1848,13 +1931,15 @@ function updateTimerLivePagesRead() {
 }
 
 function openGeneralAiBot() {
+  dismissAiSpeechBubble();
   const currentBook = activeBook || (libraryBooks.length > 0 ? libraryBooks[0] : {
     title: 'BookNest AI Companion',
     author: 'AI Book Assistant',
     genre: 'Universal Guide',
     overview: 'Your personal AI reader, story explainer, and book summarizer.'
   });
-  openChatForBook(currentBook);
+  const isGeneral = !activeBook || currentBook.title === 'BookNest AI Companion';
+  openChatForBook(currentBook, isGeneral);
 }
 
 function initReadingTimer() {

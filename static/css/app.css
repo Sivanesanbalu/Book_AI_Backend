@@ -2391,42 +2391,50 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 0 2px;
+  gap: 7px;
+  padding: 12px 0 4px;
 }
 
 .carousel-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.16);
+  background: rgba(99, 102, 241, 0.22);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] .carousel-dot {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .carousel-dot.active {
-  width: 22px;
+  width: 24px;
   border-radius: 999px;
   background: var(--accent-primary);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.5);
 }
 
 .wishlist-card {
-  flex: 0 0 155px;
+  flex: 0 0 76%;
+  max-width: 285px;
   scroll-snap-align: center;
   background: var(--bg-surface);
   border: 1px solid var(--border-card);
-  border-radius: 16px;
-  padding: 10px;
+  border-radius: 18px;
+  padding: 12px;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
+}
+
+@media (min-width: 480px) {
+  .wishlist-card {
+    flex: 0 0 220px;
+    max-width: 220px;
+  }
 }
 
 .wishlist-card:hover {
@@ -2443,50 +2451,53 @@ dialog::backdrop {
   width: 100%;
   height: 135px;
   object-fit: cover;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
-  margin-bottom: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  margin-bottom: 10px;
 }
 
 .wishlist-card-title {
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   font-weight: 800;
-  white-space: nowrap;
+  line-height: 1.25;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .wishlist-card-author {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .wishlist-card-btn {
   margin-top: auto;
   width: 100%;
-  padding: 6px 8px;
-  border-radius: 10px;
-  font-size: 0.72rem;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.76rem;
   font-weight: 700;
   background: var(--accent-gradient);
   color: #ffffff;
   border: none;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   transition: transform 0.15s ease;
 }
 
 .wishlist-card-btn:active {
-  transform: scale(0.94);
+  transform: scale(0.95);
 }
 
 /* Toggle Switch Component */
@@ -3315,35 +3326,137 @@ dialog::backdrop {
 }
 
 /* =========================================================
-   🤖 FLOATING AI BOT (LOTTIE FAB IN BOTTOM RIGHT)
+   🤖 FLOATING AI BOT (ANIMATED LOTTIE FAB + SPEECH BUBBLE)
    ========================================================= */
-.floating-ai-fab {
+.floating-ai-wrapper {
   position: fixed;
-  bottom: calc(76px + var(--safe-bottom, 12px));
-  right: calc(50% - 240px + 18px);
-  width: 58px;
-  height: 58px;
+  bottom: calc(74px + var(--safe-bottom, 12px));
+  right: calc(50% - 240px + 16px);
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+@media (max-width: 480px) {
+  .floating-ai-wrapper {
+    right: 16px;
+  }
+}
+
+/* Floating Conversational Speech Bubble */
+.ai-speech-bubble {
+  pointer-events: auto;
+  position: relative;
+  margin-bottom: 10px;
+  background: var(--bg-surface);
+  border: 1.5px solid rgba(99, 102, 241, 0.28);
+  border-radius: 18px;
+  padding: 8px 12px 8px 10px;
+  max-width: 220px;
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  animation: speechBubbleFloat 3.8s ease-in-out infinite;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ai-speech-bubble:active {
+  transform: scale(0.96);
+}
+
+.speech-bubble-body {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.speech-bubble-sparkle {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.speech-bubble-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.speech-bubble-close {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 4px;
   border-radius: 50%;
-  background: var(--bg-card);
-  border: 2px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 10px 26px rgba(99, 102, 241, 0.35), 0 4px 10px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 70;
+  transition: color 0.15s ease;
+}
+
+.speech-bubble-close:hover {
+  color: var(--accent-primary);
+}
+
+.speech-bubble-arrow {
+  position: absolute;
+  bottom: -6px;
+  right: 22px;
+  width: 12px;
+  height: 12px;
+  background: var(--bg-surface);
+  border-right: 1.5px solid rgba(99, 102, 241, 0.28);
+  border-bottom: 1.5px solid rgba(99, 102, 241, 0.28);
+  transform: rotate(45deg);
+}
+
+@keyframes speechBubbleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.floating-ai-fab {
+  pointer-events: auto;
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   outline: none;
   padding: 0;
   animation: fabFloatBob 3.5s ease-in-out infinite;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-@media (max-width: 480px) {
-  .floating-ai-fab {
-    right: 18px;
-  }
+.floating-ai-fab * {
+  pointer-events: none;
 }
 
 .floating-ai-fab:active {
@@ -3352,6 +3465,8 @@ dialog::backdrop {
 
 .floating-ai-fab:hover {
   transform: translateY(-4px) scale(1.06);
+  box-shadow: 0 14px 32px rgba(99, 102, 241, 0.5), 0 6px 14px rgba(0, 0, 0, 0.12);
+}
   box-shadow: 0 14px 30px rgba(99, 102, 241, 0.45), 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 

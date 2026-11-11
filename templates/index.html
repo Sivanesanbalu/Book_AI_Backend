@@ -949,37 +949,28 @@
     </nav>
 
     <!-- ==========================================
-         FLOATING AI BOT (ANIMATED GLOWING ROBOT FAB)
+         FLOATING AI BOT (ANIMATED LOTTIE ROBOT + SPEECH BUBBLE)
          ========================================== -->
-    <button id="floating-ai-bot" class="floating-ai-fab" type="button" title="Chat with AI Book Bot" aria-label="Open AI Assistant">
-      <div class="fab-bot-pulse"></div>
-      <div class="fab-bot-avatar">
-        <svg class="fab-ai-svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Antenna -->
-          <circle class="ai-antenna-dot" cx="24" cy="6" r="3" fill="#6366f1"/>
-          <line x1="24" y1="9" x2="24" y2="15" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round"/>
-          <!-- Robot Face Body -->
-          <rect x="8" y="15" width="32" height="25" rx="8" fill="url(#aiBotGrad)" stroke="#4f46e5" stroke-width="1.8"/>
-          <!-- Digital Visor Screen -->
-          <rect x="13" y="21" width="22" height="9" rx="4.5" fill="#0f172a"/>
-          <!-- Glowing Eyes -->
-          <circle class="ai-eye left" cx="18.5" cy="25.5" r="2.4" fill="#38bdf8"/>
-          <circle class="ai-eye right" cx="29.5" cy="25.5" r="2.4" fill="#38bdf8"/>
-          <!-- Happy Smile Line -->
-          <path d="M20 34.5c1.2 1.2 2.6 1.8 4 1.8s2.8-.6 4-1.8" stroke="#4f46e5" stroke-width="2" stroke-linecap="round"/>
-          <!-- Ear Pegs -->
-          <rect x="4.5" y="23" width="3.5" height="8" rx="1.5" fill="#818cf8"/>
-          <rect x="40" y="23" width="3.5" height="8" rx="1.5" fill="#818cf8"/>
-          <defs>
-            <linearGradient id="aiBotGrad" x1="8" y1="15" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#ffffff"/>
-              <stop offset="100%" stop-color="#e0e7ff"/>
-            </linearGradient>
-          </defs>
-        </svg>
+    <div id="ai-bot-wrapper" class="floating-ai-wrapper">
+      <!-- Conversational Speech Bubble Prompt -->
+      <div id="ai-bot-speech-bubble" class="ai-speech-bubble" onclick="openGeneralAiBot()" role="button" tabindex="0" title="Tap to chat with AI">
+        <div class="speech-bubble-body">
+          <span class="speech-bubble-sparkle">🤖</span>
+          <span class="speech-bubble-text" id="ai-bubble-text">Hi! What do you want to read? Tap me!</span>
+        </div>
+        <button id="close-speech-bubble" class="speech-bubble-close" type="button" aria-label="Close" onclick="event.stopPropagation(); dismissAiSpeechBubble();">×</button>
+        <div class="speech-bubble-arrow"></div>
       </div>
-      <span class="fab-badge-glow">AI</span>
-    </button>
+
+      <!-- Floating Robot Action Button -->
+      <button id="floating-ai-bot" class="floating-ai-fab" type="button" title="Chat with AI Book Bot" aria-label="Open AI Assistant" onclick="openGeneralAiBot()">
+        <div class="fab-bot-pulse"></div>
+        <div class="fab-bot-avatar">
+          <lottie-player id="ai-lottie-player" src="/static/robot_animation.json" background="transparent" speed="1" style="width: 54px; height: 54px; pointer-events: none;" loop autoplay></lottie-player>
+        </div>
+        <span class="fab-badge-glow">AI</span>
+      </button>
+    </div>
 
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
