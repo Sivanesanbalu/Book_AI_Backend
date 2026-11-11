@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadNetworkInfo();
   registerPWA();
   checkFirstTimeUser();
+  initDailyReminderNotification();
 
   // Shutter action
   if (shutterBtn) shutterBtn.addEventListener('click', captureAndScan);
@@ -1416,6 +1417,16 @@ function initDashboardEvents() {
     switchToTab('tab-library');
   });
 
+  document.getElementById('view-all-wishlist-btn')?.addEventListener('click', () => {
+    switchToTab('tab-library');
+    const wishChip = document.querySelector('.filter-btn[data-status-filter="Wishlist"]');
+    if (wishChip) wishChip.click();
+  });
+
+  document.getElementById('dash-browse-wishlist-btn')?.addEventListener('click', () => {
+    switchToTab('tab-library');
+  });
+
   document.getElementById('dash-explore-btn')?.addEventListener('click', () => {
     switchToTab('tab-scan');
   });
@@ -1535,6 +1546,53 @@ function updateDashboardView() {
       reminderMsg.textContent = `Scan your first book cover or pick from library to start your daily reading journey!`;
     }
   }
+
+  // Populate Wishlist Shelf ("Whistle Book List")
+  const wishlistBooks = libraryBooks.filter(b => {
+    const s = (b.status || '').toLowerCase();
+    return s.includes('wish') || s.includes('want');
+  });
+
+  const wishCountBadge = document.getElementById('dash-wishlist-count-badge');
+  const wishContainer = document.getElementById('dash-wishlist-container');
+  const noWishPlaceholder = document.getElementById('no-wishlist-placeholder');
+
+  if (wishCountBadge) wishCountBadge.textContent = wishlistBooks.length;
+
+  if (wishContainer) {
+    if (wishlistBooks.length > 0) {
+      wishContainer.style.display = 'flex';
+      if (noWishPlaceholder) noWishPlaceholder.style.display = 'none';
+
+      wishContainer.innerHTML = wishlistBooks.map(b => `
+        <div class="wishlist-card 3d-card" onclick="openBookModal('${encodeURIComponent(b.title)}')">
+          <img src="${b.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=200&q=80'}" class="wishlist-card-cover" alt="cover">
+          <div class="wishlist-card-title">${escapeHtml(b.title)}</div>
+          <div class="wishlist-card-author">by ${escapeHtml(b.author || 'Author Unknown')}</div>
+          <button type="button" class="wishlist-card-btn" onclick="event.stopPropagation(); startReadingWishlistBook('${encodeURIComponent(b.title)}')">
+            ▶ Start Read
+          </button>
+        </div>
+      `).join('');
+    } else {
+      wishContainer.style.display = 'none';
+      if (noWishPlaceholder) noWishPlaceholder.style.display = 'block';
+    }
+  }
+}
+
+async function startReadingWishlistBook(encodedTitle) {
+  const title = decodeURIComponent(encodedTitle);
+  const book = libraryBooks.find(b => b.title === title);
+  if (!book) return;
+
+  book.status = 'Reading';
+  await updateBookOnServer(book);
+  selectTimerBook(book.title);
+  switchToTab('tab-timer');
+  showToast(`📖 Now reading '${book.title}'! Let's go!`);
+  updateDashboardView();
+  loadLibrary();
 }
 
 // =========================================================
@@ -1861,5 +1919,168 @@ async function addRecommendedBook(encodedJson) {
     }
   } catch (err) {
     showToast('⚠️ Could not add recommended book');
+  }
+}
+
+// =========================================================
+// 🔔 DAILY READING NOTIFICATION & HABIT ATTRACTOR
+// =========================================================
+function initDailyReminderNotification() {
+  const toggle = document.getElementById('daily-notif-toggle');
+  const timeSelect = document.getElementById('notif-time-select');
+  const testBtn = document.getElementById('test-daily-notif-btn');
+  const statusDesc = document.getElementById('notif-status-desc');
+
+  // Load saved preferences
+  const enabled = localStorage.getItem('booknest_daily_notif_enabled') !== 'false';
+  const savedTime = localStorage.getItem('booknest_notif_time') || '20:00';
+
+  if (toggle) toggle.checked = enabled;
+  if (timeSelect) timeSelect.value = savedTime;
+
+  if (statusDesc) {
+    statusDesc.textContent = enabled
+      ? `Active • Daily reminder scheduled at ${formatTimeString(savedTime)}`
+      : 'Disabled • Tap toggle to receive daily habit reminders';
+  }
+
+  // Toggle switch handler
+  toggle?.addEventListener('change', async (e) => {
+    const isChecked = e.target.checked;
+    localStorage.setItem('booknest_daily_notif_enabled', isChecked ? 'true' : 'false');
+
+    if (isChecked) {
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          showToast('🔔 Daily Reading Notifications Enabled!');
+        } else {
+          showToast('⚠️ Notifications blocked in browser settings');
+        }
+      } else {
+        showToast('🔔 Daily Reading Notifications Active!');
+      }
+    } else {
+      showToast('🔕 Daily Notifications Paused');
+    }
+
+    if (statusDesc) {
+      statusDesc.textContent = isChecked
+        ? `Active • Daily reminder scheduled at ${formatTimeString(timeSelect?.value || '20:00')}`
+        : 'Disabled • Tap toggle to receive daily habit reminders';
+    }
+  });
+
+  // Time select handler
+  timeSelect?.addEventListener('change', (e) => {
+    localStorage.setItem('booknest_notif_time', e.target.value);
+    showToast(`⏰ Reminder set to ${formatTimeString(e.target.value)}`);
+    if (statusDesc && toggle?.checked) {
+      statusDesc.textContent = `Active • Daily reminder scheduled at ${formatTimeString(e.target.value)}`;
+    }
+  });
+
+  // Test button handler
+  testBtn?.addEventListener('click', async () => {
+    if ('Notification' in window && Notification.permission !== 'granted') {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        showToast('⚠️ Please allow notifications in prompt');
+      }
+    }
+    sendDailyAttractionNotification(true);
+  });
+
+  // Check on load & every 60 seconds
+  checkDailyAttractionNotification();
+  setInterval(checkDailyAttractionNotification, 60000);
+}
+
+function formatTimeString(timeStr) {
+  if (!timeStr) return '8:00 PM';
+  const [h, m] = timeStr.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+function checkDailyAttractionNotification() {
+  const isEnabled = localStorage.getItem('booknest_daily_notif_enabled') !== 'false';
+  if (!isEnabled) return;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const lastSentDate = localStorage.getItem('booknest_last_notif_date');
+  if (lastSentDate === todayStr) return; // Only once a day!
+
+  const targetTime = localStorage.getItem('booknest_notif_time') || '20:00';
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const [tH, tM] = targetTime.split(':').map(Number);
+  const targetMinutes = tH * 60 + tM;
+
+  // Trigger if within scheduled time
+  if (currentMinutes >= targetMinutes) {
+    sendDailyAttractionNotification(false);
+    localStorage.setItem('booknest_last_notif_date', todayStr);
+  }
+}
+
+function sendDailyAttractionNotification(isTest = false) {
+  const streak = parseInt(localStorage.getItem('booknest_streak') || '3');
+  const readingBook = libraryBooks.find(b => (b.status || '').toLowerCase() === 'reading');
+  const wishlistBook = libraryBooks.find(b => {
+    const s = (b.status || '').toLowerCase();
+    return s.includes('wish') || s.includes('want');
+  });
+
+  let notifTitle = '📖 Time for Your Daily Reading!';
+  let notifBody = 'Spend 15 minutes today with your books! Pick up where you left off.';
+
+  if (readingBook) {
+    const p = readingBook.current_page || 1;
+    notifTitle = `📖 Dive back into '${readingBook.title}'!`;
+    notifBody = `Page ${p} is waiting! Read 15 mins today to keep your ${streak}-day streak burning 🔥`;
+  } else if (wishlistBook) {
+    notifTitle = `⭐ Next on your list: '${wishlistBook.title}'`;
+    notifBody = `Start chapter 1 today! Your reading journey is waiting 🚀`;
+  } else {
+    notifTitle = '✨ Daily Reading Habit Reminder';
+    notifBody = `"A reader lives a thousand lives before he dies." Open your book today and fuel your mind!`;
+  }
+
+  // 1. Browser OS Push Notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(notifTitle, {
+            body: notifBody,
+            icon: '/static/icons/icon-192.png',
+            badge: '/static/icons/icon-192.png',
+            vibrate: [200, 100, 200],
+            tag: 'booknest-daily-reminder'
+          });
+        });
+      } else {
+        new Notification(notifTitle, {
+          body: notifBody,
+          icon: '/static/icons/icon-192.png'
+        });
+      }
+    } catch (e) {
+      console.warn('Could not dispatch OS notification:', e);
+    }
+  }
+
+  // 2. In-App Attraction Notification Toast
+  if (isTest) {
+    showToast(`🔔 Test Alert: ${notifTitle} (Daily reminder active!)`);
+  } else {
+    showToast(`🔔 ${notifTitle} — ${notifBody}`);
+  }
+
+  // Vibrate phone if supported
+  if ('vibrate' in navigator) {
+    try { navigator.vibrate([150, 75, 150]); } catch (e) {}
   }
 }

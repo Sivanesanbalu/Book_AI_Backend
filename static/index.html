@@ -160,6 +160,30 @@
         </div>
       </div>
 
+      <!-- Reading Wishlist Shelf ("Whistle Book List") -->
+      <div class="wishlist-shelf-box 3d-card" id="wishlist-shelf">
+        <div class="shelf-header">
+          <div class="shelf-title" style="display: flex; align-items: center; gap: 8px;">
+            <span>⭐ Reading Wishlist</span>
+            <span id="dash-wishlist-count-badge" class="wishlist-badge">0</span>
+          </div>
+          <button id="view-all-wishlist-btn" class="text-link-btn">View All</button>
+        </div>
+
+        <div id="dash-wishlist-container" class="wishlist-scroll-row">
+          <!-- Populated dynamically with Wishlist books -->
+        </div>
+
+        <div id="no-wishlist-placeholder" class="no-reading-state" style="display: none; padding: 18px 10px;">
+          <div style="font-size: 1.6rem; margin-bottom: 4px;">⭐</div>
+          <div style="font-weight: 700; font-size: 0.88rem;">Your Wishlist is Empty</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px;">Save books to read next or explore recommendations!</div>
+          <button id="dash-browse-wishlist-btn" class="btn-secondary 3d-btn-secondary" style="font-size: 0.78rem; padding: 6px 14px;">
+            Browse 1,005 Catalog 📚
+          </button>
+        </div>
+      </div>
+
       <!-- Quick Action Shortcuts -->
       <div class="dash-quick-actions">
         <button id="dash-quick-scan-btn" class="quick-action-card 3d-card">
@@ -543,6 +567,37 @@
             </div>
             <button type="button" id="profile-theme-toggle-btn" class="theme-switch-pill-btn">
               Toggle Theme
+            </button>
+          </div>
+        </div>
+
+        <!-- Daily Reading Reminder Notifications Setting -->
+        <div class="pref-card 3d-card" style="margin: 10px 0 16px 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 1.6rem;">🔔</span>
+              <div style="text-align: left;">
+                <div style="font-weight: 800; font-size: 0.95rem;">Daily Habit Reminder</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);" id="notif-status-desc">
+                  Attracts you to read once a day & protects your streak
+                </div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="daily-notif-toggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+            <select id="notif-time-select" class="category-select" style="flex: 2; padding: 8px 12px; font-size: 0.8rem;">
+              <option value="20:00">Evening Focus (8:00 PM) 🌙</option>
+              <option value="08:00">Morning Inspiration (8:00 AM) ☀️</option>
+              <option value="13:00">Midday Break (1:00 PM) ☕</option>
+              <option value="21:30">Bedtime Wind-Down (9:30 PM) 📖</option>
+            </select>
+            <button type="button" id="test-daily-notif-btn" class="btn-secondary 3d-btn-secondary" style="flex: 1; padding: 8px 10px; font-size: 0.78rem; white-space: nowrap;">
+              🔔 Test Now
             </button>
           </div>
         </div>
