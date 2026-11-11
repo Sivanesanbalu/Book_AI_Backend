@@ -49,14 +49,15 @@ Please generate a JSON object with:
 
 Output ONLY raw valid JSON without markdown fences.
 """
+            # Active Groq LLM: qwen/qwen3.8-27b
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "qwen/qwen3.8-27b",
                 "messages": [
                     {"role": "system", "content": "You are a master literary critic and book storyteller. Output valid JSON only."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.5,
-                "max_tokens": 400
+                "max_tokens": 600
             }
             res = requests.post(url, headers=headers, json=payload, timeout=20)
             if res.status_code == 200:
@@ -130,10 +131,10 @@ def chat_with_book_ai(book: dict, user_message: str, history: list = None):
             messages.append({"role": "user", "content": user_message})
 
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "qwen/qwen3.8-27b",
                 "messages": messages,
                 "temperature": 0.6,
-                "max_tokens": 350
+                "max_tokens": 600
             }
 
             res = requests.post(url, headers=headers, json=payload, timeout=20)

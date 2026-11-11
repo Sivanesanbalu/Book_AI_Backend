@@ -55,8 +55,9 @@ def detect_book_with_groq(image_path: str):
             "Content-Type": "application/json"
         }
 
-        # Try llama-3.2-11b-vision-preview
+        # Active Groq multimodal vision models
         models_to_try = [
+            "qwen/qwen3.8-27b",
             "llama-3.2-11b-vision-preview",
             "llama-3.2-90b-vision-preview"
         ]
