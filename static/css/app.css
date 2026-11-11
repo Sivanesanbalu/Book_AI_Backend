@@ -394,16 +394,211 @@ body::before {
 /* ---------- CAMERA VIEWPORT & HUD ---------- */
 .scanner-viewport {
   width: 100%;
-  height: 380px;
+  height: calc(100vh - 145px);
+  min-height: 520px;
+  max-height: 720px;
   background: #000;
-  border-radius: 24px;
+  border-radius: 28px;
   overflow: hidden;
   position: relative;
-  box-shadow: var(--shadow-3d);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+  .scanner-viewport {
+    height: calc(100vh - 128px);
+    min-height: 480px;
+    max-height: none;
+    border-radius: 24px;
+    margin-bottom: 16px;
+  }
+}
+
+/* Floating Top Controls Bar inside Camera Viewfinder */
+.cam-overlay-top {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.cam-glass-btn {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 14px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
+}
+
+.cam-glass-btn:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.04);
+}
+
+.cam-glass-btn:active {
+  transform: scale(0.96);
+}
+
+.cam-glass-btn.active {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.cam-status-pill {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.5px;
+}
+
+/* Floating Bottom Controls Bar inside Camera Viewfinder */
+.cam-overlay-bottom {
+  position: absolute;
+  bottom: 24px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.cam-control-icon-btn {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 18px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-width: 64px;
+}
+
+.cam-control-icon-btn span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.cam-control-icon-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.cam-control-icon-btn:active {
+  transform: scale(0.95);
+}
+
+.cam-icon-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Already In Library Alert Banner */
+.already-in-lib-box {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(6, 182, 212, 0.09));
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  border-radius: 16px;
+  padding: 12px 16px;
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+  animation: slideDownFade 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideDownFade {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.already-lib-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.already-lib-details {
+  flex: 1;
+}
+
+.already-lib-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--accent-success);
+  margin-bottom: 2px;
+}
+
+.already-lib-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.jump-lib-btn {
+  background: var(--accent-success);
+  color: #fff;
+  border: none;
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.jump-lib-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.jump-lib-btn:active {
+  transform: scale(0.96);
 }
 
 #camera-video {

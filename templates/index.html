@@ -53,21 +53,30 @@
          ========================================== -->
     <main id="tab-scan" class="tab-content active">
 
-      <!-- Direct APK / Install Helper Strip -->
-      <div class="install-banner">
-        <div class="install-text">
-          <span class="pulse-dot"></span>
-          <span><strong>AI Visual Scanner</strong> • Point camera at any book cover</span>
-        </div>
-        <a href="/download" class="apk-chip" title="Download Android APK">
-          📥 APK
-        </a>
-      </div>
-      
-      <!-- Camera Viewfinder with 3D Holographic HUD -->
-      <div class="scanner-viewport">
+      <!-- Fullscreen Camera Viewfinder with 3D Holographic HUD & Floating Controls -->
+      <div class="scanner-viewport fullscreen-viewport">
         <video id="camera-video" autoplay playsinline muted></video>
         <div class="scan-laser"></div>
+
+        <!-- Top Floating Overlay Controls: Flash & Flip -->
+        <div class="cam-overlay-top">
+          <button class="cam-glass-btn" id="flash-toggle-btn" title="Toggle Flash / Torch">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+            <span id="flash-btn-label">Flash</span>
+          </button>
+
+          <div class="cam-status-pill">
+            <span class="pulse-dot"></span>
+            <span>AI Scanner</span>
+          </div>
+
+          <button class="cam-glass-btn" id="top-flip-cam-btn" title="Flip Camera">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5V13H9v2.5L5.5 12 9 8.5V11h6V8.5l3.5 3.5-3.5 3.5z"/></svg>
+            <span>Flip</span>
+          </button>
+        </div>
+
+        <!-- HUD Target Viewfinder -->
         <div class="hud-target">
           <div class="hud-corner hud-tl"></div>
           <div class="hud-corner hud-tr"></div>
@@ -76,6 +85,30 @@
           <div class="hud-reticle"></div>
         </div>
         <div class="hud-caption">Align Book Cover in Viewfinder</div>
+
+        <!-- Bottom Floating Controls: Gallery, Shutter, Flip -->
+        <div class="cam-overlay-bottom">
+          <button class="cam-control-icon-btn" id="upload-btn" title="Choose from Photo Gallery">
+            <div class="cam-icon-circle">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+            </div>
+            <span>Gallery</span>
+          </button>
+          <input type="file" id="photo-input" accept="image/*" style="display: none;">
+
+          <button class="shutter-btn 3d-shutter" id="shutter-btn" title="Capture & Scan Cover">
+            <div class="shutter-inner">
+              <div class="shutter-glow"></div>
+            </div>
+          </button>
+
+          <button class="cam-control-icon-btn" id="switch-cam-btn" title="Flip Camera">
+            <div class="cam-icon-circle">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5V13H9v2.5L5.5 12 9 8.5V11h6V8.5l3.5 3.5-3.5 3.5z"/></svg>
+            </div>
+            <span>Flip</span>
+          </button>
+        </div>
 
         <!-- 3D Scanning Hologram Loading Overlay -->
         <div id="scanning-overlay" class="scanning-overlay" style="display: none;">
@@ -94,28 +127,19 @@
         </div>
       </div>
 
-      <!-- Controls -->
-      <div class="scanner-controls">
-        <button class="ctrl-btn 3d-btn" id="switch-cam-btn" title="Switch Front/Back Camera">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5V13H9v2.5L5.5 12 9 8.5V11h6V8.5l3.5 3.5-3.5 3.5z"/></svg>
-          <span>Flip</span>
-        </button>
-
-        <button class="shutter-btn 3d-shutter" id="shutter-btn" title="Capture & Scan Cover">
-          <div class="shutter-inner">
-            <div class="shutter-glow"></div>
-          </div>
-        </button>
-
-        <button class="ctrl-btn 3d-btn" id="upload-btn" title="Choose from Photo Gallery">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-          <span>Gallery</span>
-        </button>
-        <input type="file" id="photo-input" accept="image/*" style="display: none;">
-      </div>
-
       <!-- Scan Result Card (3D Glassmorphic Card) -->
       <div id="scan-result-card" class="card 3d-card" style="display: none;">
+        
+        <!-- Already in Library Alert Notification Banner -->
+        <div id="already-in-lib-banner" class="already-in-lib-box" style="display: none;">
+          <div class="already-lib-icon">📚</div>
+          <div class="already-lib-details">
+            <div class="already-lib-title">Already In Your Library!</div>
+            <div class="already-lib-desc" id="already-lib-desc">This book is already saved in your personal collection.</div>
+          </div>
+          <button type="button" id="jump-to-lib-btn" class="jump-lib-btn" title="Open Book in Library">Open in Library</button>
+        </div>
+
         <div id="result-badge" class="result-badge badge-owned">
           ✓ In Database
         </div>
@@ -362,44 +386,6 @@
     </section>
 
     <!-- ==========================================
-         TAB 4: PHONE CONNECT / PWA SCREEN
-         ========================================== -->
-    <section id="tab-connect" class="tab-content">
-      <div class="connect-card 3d-card">
-        <div class="connect-header-icon">📱</div>
-        <h2 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 6px;">Open On Your Phone</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">Scan with your mobile camera to launch BookNest AI with instant camera access!</p>
-
-        <div class="qr-box" id="qrcode-box">
-          <div style="font-size: 0.82rem; color: #64748b;">Loading QR Code...</div>
-        </div>
-
-        <div style="margin: 18px 0;">
-          <a href="/download" class="btn-primary 3d-btn-primary" style="text-decoration: none; font-size: 0.95rem; padding: 14px 20px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-            <span>📥 Download BookNest AI APK</span>
-          </a>
-        </div>
-
-        <div class="url-badge" id="connect-url-display">http://localhost:8000</div>
-
-        <div class="step-list">
-          <div class="step-row">
-            <div class="step-num">1</div>
-            <div>Open your phone's camera and scan this QR code.</div>
-          </div>
-          <div class="step-row">
-            <div class="step-num">2</div>
-            <div>Tap the link to immediately open the live camera scanner on your mobile device.</div>
-          </div>
-          <div class="step-row">
-            <div class="step-num">3</div>
-            <div>In Safari or Chrome, tap <strong>"Add to Home Screen"</strong> to install it as an app!</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==========================================
          3D BOOK READING & DETAIL MODAL (<dialog>)
          ========================================== -->
     <dialog id="book-modal" class="book-detail-dialog" closedby="any" aria-labelledby="modal-book-title">
@@ -592,10 +578,6 @@
       <a href="#" class="nav-item" data-tab="tab-profile">
         <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
         <span>Profile</span>
-      </a>
-      <a href="#" class="nav-item" data-tab="tab-connect">
-        <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
-        <span>To Phone</span>
       </a>
     </nav>
 

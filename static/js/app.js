@@ -58,8 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (uploadBtn) uploadBtn.addEventListener('click', () => photoInput.click());
   if (photoInput) photoInput.addEventListener('change', handleFileSelected);
 
-  // Switch camera
+  // Switch camera (both bottom and top buttons)
   if (switchCamBtn) switchCamBtn.addEventListener('click', toggleCamera);
+  const topFlipBtn = document.getElementById('top-flip-cam-btn');
+  if (topFlipBtn) topFlipBtn.addEventListener('click', toggleCamera);
+
+  // Flash / Torch toggle
+  const flashToggleBtn = document.getElementById('flash-toggle-btn');
+  if (flashToggleBtn) flashToggleBtn.addEventListener('click', toggleTorch);
 
   // Theme toggle
   if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
@@ -124,31 +130,38 @@ function updateThemeIcon(theme) {
 // =========================================================
 // 🧭 TAB NAVIGATION
 // =========================================================
-function initNavigation() {
+function switchToTab(targetTab) {
   const navItems = document.querySelectorAll('.nav-item');
   const tabs = document.querySelectorAll('.tab-content');
+
+  navItems.forEach((n) => {
+    if (n.getAttribute('data-tab') === targetTab) n.classList.add('active');
+    else n.classList.remove('active');
+  });
+
+  tabs.forEach((t) => {
+    if (t.id === targetTab) t.classList.add('active');
+    else t.classList.remove('active');
+  });
+
+  if (targetTab === 'tab-scan') {
+    if (!currentStream) initCamera();
+  } else {
+    stopCamera();
+  }
+
+  if (targetTab === 'tab-library') loadLibrary();
+  if (targetTab === 'tab-profile') loadProfile();
+}
+
+function initNavigation() {
+  const navItems = document.querySelectorAll('.nav-item');
 
   navItems.forEach((item) => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       const targetTab = item.getAttribute('data-tab');
-
-      navItems.forEach((n) => n.classList.remove('active'));
-      tabs.forEach((t) => t.classList.remove('active'));
-
-      item.classList.add('active');
-      const activeTabEl = document.getElementById(targetTab);
-      if (activeTabEl) activeTabEl.classList.add('active');
-
-      if (targetTab === 'tab-scan') {
-        if (!currentStream) initCamera();
-      } else {
-        stopCamera();
-      }
-
-      if (targetTab === 'tab-library') loadLibrary();
-      if (targetTab === 'tab-profile') loadProfile();
-      if (targetTab === 'tab-connect') loadNetworkInfo();
+      switchToTab(targetTab);
     });
   });
 }
@@ -381,6 +394,40 @@ function toggleCamera() {
   showToast(`📷 Switched camera`);
 }
 
+let isTorchActive = false;
+async function toggleTorch() {
+  if (!currentStream) {
+    showToast('⚠️ Camera stream is not active');
+    return;
+  }
+  const track = currentStream.getVideoTracks()[0];
+  if (!track) {
+    showToast('⚠️ Camera track not found');
+    return;
+  }
+
+  try {
+    isTorchActive = !isTorchActive;
+    await track.applyConstraints({
+      advanced: [{ torch: isTorchActive }]
+    });
+
+    const flashBtn = document.getElementById('flash-toggle-btn');
+    const flashLabel = document.getElementById('flash-btn-label');
+    if (flashBtn) {
+      flashBtn.classList.toggle('active', isTorchActive);
+    }
+    if (flashLabel) {
+      flashLabel.textContent = isTorchActive ? 'Flash ON' : 'Flash';
+    }
+    showToast(isTorchActive ? '⚡ Flash ON' : '⚡ Flash OFF');
+  } catch (err) {
+    console.warn('Torch constraint error:', err);
+    isTorchActive = false;
+    showToast('💡 Flash not supported on this lens');
+  }
+}
+
 // =========================================================
 // 🔍 3D SCANNING & IDENTIFICATION
 // =========================================================
@@ -480,11 +527,19 @@ function showScanningOverlay(show) {
 // 🎯 DISPLAY SCAN RESULT & CATEGORY ASSIGNMENT
 // =========================================================
 function displayScanResult(data) {
-  const isOwned = data.status === 'owned';
+  // Check against locally loaded library books as well as backend status
+  const existingBook = libraryBooks.find(b => {
+    if (!b || !b.title) return false;
+    const t1 = b.title.toLowerCase().trim();
+    const t2 = (data.title || '').toLowerCase().trim();
+    return t1 === t2 || (t1.length > 5 && t2.length > 5 && (t1.includes(t2) || t2.includes(t1)));
+  });
+
+  const isOwned = data.status === 'owned' || !!existingBook;
   const confidencePct = Math.round((data.confidence || 0.95) * 100);
 
   // Auto detect likely category
-  let defaultGenre = data.genre || 'Fiction 📚';
+  let defaultGenre = data.genre || (existingBook ? existingBook.genre : 'Fiction 📚');
   const rawGenre = (data.genre || '').toLowerCase();
   if (rawGenre.includes('comic') || rawGenre.includes('graphic')) defaultGenre = 'Comics 💥';
   else if (rawGenre.includes('manga') || rawGenre.includes('anime')) defaultGenre = 'Manga 🎌';
@@ -496,27 +551,69 @@ function displayScanResult(data) {
 
   activeBook = {
     title: data.title,
-    author: data.author || 'Author Unknown',
+    author: data.author || (existingBook ? existingBook.author : 'Author Unknown'),
     genre: defaultGenre,
-    cover_url: data.cover_url || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=400&q=80',
-    overview: data.overview || '',
+    cover_url: data.cover_url || (existingBook ? existingBook.cover_url : 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=400&q=80'),
+    overview: data.overview || (existingBook ? existingBook.overview : ''),
     scenario: data.scenario || null,
     confidence: data.confidence || 0.95,
     isOwned: isOwned,
-    status: 'Reading'
+    status: existingBook ? (existingBook.status || 'Reading') : 'Reading'
   };
 
   resultCard.style.display = 'block';
   resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-  // Badge
+  // Badge & Already-In-Library Banner
   const badgeEl = document.getElementById('result-badge');
+  const alreadyBanner = document.getElementById('already-in-lib-banner');
+  const alreadyDesc = document.getElementById('already-lib-desc');
+  const jumpBtn = document.getElementById('jump-to-lib-btn');
+  const saveBtn = document.getElementById('save-book-btn');
+
   if (isOwned) {
+    const curStatus = existingBook ? (existingBook.status || 'Reading') : 'Saved';
     badgeEl.className = 'result-badge badge-owned';
-    badgeEl.innerHTML = '✓ In Your Library';
+    badgeEl.innerHTML = '✓ Already In Your Library';
+
+    if (alreadyBanner) {
+      alreadyBanner.style.display = 'flex';
+      if (alreadyDesc) {
+        alreadyDesc.textContent = `You already have '${activeBook.title}' in your collection! Status: ${curStatus}.`;
+      }
+    }
+
+    if (jumpBtn) {
+      jumpBtn.onclick = () => {
+        switchToTab('tab-library');
+        openBookModal(existingBook || activeBook);
+      };
+    }
+
+    saveBtn.innerHTML = '📖 View in Library';
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = '1';
+    saveBtn.onclick = () => {
+      switchToTab('tab-library');
+      openBookModal(existingBook || activeBook);
+    };
+
+    // User requested explicit notification: "told me its already in your library like a message"
+    showToast(`📖 Already in your Library! '${activeBook.title}' is in your collection.`);
   } else {
     badgeEl.className = 'result-badge badge-new';
-    badgeEl.innerHTML = '★ New Book';
+    badgeEl.innerHTML = '★ New Discovery';
+
+    if (alreadyBanner) {
+      alreadyBanner.style.display = 'none';
+    }
+
+    saveBtn.innerHTML = '+ Save to My Library';
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = '1';
+    saveBtn.onclick = () => saveActiveBook();
+
+    showToast(`✨ Book Found: '${activeBook.title}'`);
   }
 
   // Meta
@@ -535,19 +632,6 @@ function displayScanResult(data) {
         break;
       }
     }
-  }
-
-  // Action buttons
-  const saveBtn = document.getElementById('save-book-btn');
-  if (isOwned) {
-    saveBtn.innerHTML = '✓ In Your Library';
-    saveBtn.disabled = true;
-    saveBtn.style.opacity = '0.7';
-  } else {
-    saveBtn.innerHTML = '+ Save to My Library';
-    saveBtn.disabled = false;
-    saveBtn.style.opacity = '1';
-    saveBtn.onclick = () => saveActiveBook();
   }
 
   document.getElementById('open-ai-chat-btn').onclick = () => openChatForBook(activeBook);
