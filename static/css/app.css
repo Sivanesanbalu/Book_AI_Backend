@@ -78,23 +78,21 @@
 }
 
 html {
-  height: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
   font-family: var(--font-sans);
   background: var(--bg-primary);
   color: var(--text-main);
-  min-height: 100%;
+  min-height: 100vh;
   min-height: 100dvh;
-  min-height: -webkit-fill-available;
-  display: flex;
-  flex-direction: column;
   overflow-x: hidden;
+  overflow-y: visible;
   position: relative;
   transition: background 0.3s ease, color 0.3s ease;
-  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -270,7 +268,8 @@ body::before {
 /* ---------- TAB SYSTEM (SMOOTH MOBILE FIT & MOTION) ---------- */
 .tab-content {
   display: none;
-  flex: 1;
+  flex: 1 0 auto;
+  min-height: calc(100vh - 140px);
   padding: calc(64px + 14px) 16px calc(76px + var(--safe-bottom));
   opacity: 0;
   transform: translateY(8px) scale(0.995);
