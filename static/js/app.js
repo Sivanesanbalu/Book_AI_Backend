@@ -2088,23 +2088,30 @@ function initReadingTimer() {
   if (!select) return;
 
   const currentVal = select.value;
-  select.innerHTML = '<option value="">-- Choose a Book to Read --</option>';
+  select.innerHTML = '<option value="">-- Choose a Book (A to Z) --</option>';
 
-  libraryBooks.forEach(b => {
+  // Sort books alphabetically (A to Z) by title for easy selection
+  const sortedBooks = [...libraryBooks].sort((a, b) => {
+    const titleA = (a.title || '').trim();
+    const titleB = (b.title || '').trim();
+    return titleA.localeCompare(titleB, undefined, { sensitivity: 'base', numeric: true });
+  });
+
+  sortedBooks.forEach(b => {
     const opt = document.createElement('option');
     opt.value = b.title;
     opt.textContent = `${b.title} (${b.current_page || 0}/${b.total_pages || 300}p)`;
     select.appendChild(opt);
   });
 
-  if (activeTimerBookTitle) {
+  if (activeTimerBookTitle && libraryBooks.some(b => b.title === activeTimerBookTitle)) {
     select.value = activeTimerBookTitle;
     onTimerBookSelected(activeTimerBookTitle);
-  } else if (currentVal) {
+  } else if (currentVal && libraryBooks.some(b => b.title === currentVal)) {
     select.value = currentVal;
     onTimerBookSelected(currentVal);
-  } else if (libraryBooks.length > 0) {
-    const readingBook = libraryBooks.find(b => (b.status || '').toLowerCase() === 'reading') || libraryBooks[0];
+  } else if (sortedBooks.length > 0) {
+    const readingBook = sortedBooks.find(b => (b.status || '').toLowerCase() === 'reading') || sortedBooks[0];
     select.value = readingBook.title;
     onTimerBookSelected(readingBook.title);
   }
