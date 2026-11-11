@@ -133,11 +133,14 @@ def verify_user(id_token: str) -> str:
     Verify Firebase ID token or return local user uid
     """
     if not id_token:
-        return "default_user"
+        return "guest_user"
 
     clean_token = id_token.strip()
-    if clean_token.lower() in ("default", "guest", "demo", "brother", "user", "bearer demo"):
-        return "default_user"
+    if clean_token.lower().startswith("bearer "):
+        clean_token = clean_token[7:].strip()
+
+    if clean_token.lower() in ("default", "demo", "brother", "user", "bearer demo"):
+        return "guest_user"
 
     if clean_token in _last_verify:
         uid, exp = _last_verify[clean_token]
@@ -152,10 +155,8 @@ def verify_user(id_token: str) -> str:
             return uid
         except Exception as e:
             print("🔥 Firebase token verification failed:", e)
-            # Graceful fallback to default user for local testing
-            return "default_user"
 
-    return "default_user"
+    return clean_token or "guest_user"
 
 
 # ---------------- NORMALIZATION ----------------
@@ -293,7 +294,7 @@ def get_user_profile(uid: str):
             user_row = conn.execute("SELECT * FROM users WHERE uid = ?", (uid,)).fetchone()
             if not user_row:
                 conn.execute(
-                    "INSERT INTO users (uid, name, email) VALUES (?, 'Brother', 'brother@bookai.local')",
+                    "INSERT INTO users (uid, name, email, avatar, reading_goal) VALUES (?, 'Reader', 'reader@booknest.local', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80', 25)",
                     (uid,)
                 )
                 conn.commit()

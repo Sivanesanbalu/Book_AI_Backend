@@ -57,11 +57,11 @@ index_lock = Lock()
 async def get_uid(request: Request):
     auth_header = request.headers.get("Authorization")
     if not auth_header:
-        return "default_user"
+        return "guest_user"
 
     token = auth_header.split(" ")[-1] if " " in auth_header else auth_header
     uid = verify_user(token)
-    return uid or "default_user"
+    return uid or "guest_user"
 
 
 # =========================================================

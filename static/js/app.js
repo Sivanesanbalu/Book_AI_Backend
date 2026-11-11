@@ -11,14 +11,17 @@ let currentCategoryFilter = 'ALL';
 let currentStatusFilter = 'ALL';
 let facingMode = 'environment';
 
-// Current Authenticated User (saved in localStorage)
-let currentUser = {
-  uid: 'default_user',
-  name: 'Brother Reader',
-  email: 'brother@bookai.local',
+// Guest User Blueprint (Clean State, 0 books)
+const GUEST_USER = {
+  uid: 'guest_user',
+  name: 'Reader',
+  email: 'reader@booknest.local',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80',
   reading_goal: 25
 };
+
+// Current Authenticated User (saved in localStorage)
+let currentUser = { ...GUEST_USER };
 
 // DOM Elements
 const videoEl = document.getElementById('camera-video');
@@ -183,13 +186,25 @@ function initNavigation() {
 // 👤 USER PROFILE & GOOGLE AUTH
 // =========================================================
 function loadStoredUser() {
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
   const saved = localStorage.getItem('booknest_user');
-  if (saved) {
+  if (isAuth && saved) {
     try {
-      currentUser = { ...currentUser, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      // Clean up legacy test data / brother user if present
+      if (parsed.uid === 'default_user' || (parsed.name && parsed.name.includes('Brother'))) {
+        localStorage.removeItem('booknest_user');
+        localStorage.removeItem('booknest_user_authenticated');
+        localStorage.removeItem('booknest_streak');
+        currentUser = { ...GUEST_USER };
+      } else {
+        currentUser = { ...GUEST_USER, ...parsed };
+      }
     } catch (e) {
-      console.warn('Could not parse stored user');
+      currentUser = { ...GUEST_USER };
     }
+  } else {
+    currentUser = { ...GUEST_USER };
   }
   updateUserUI();
 }
@@ -240,18 +255,16 @@ function updateUserUI() {
 
 function handleLogout() {
   localStorage.removeItem('booknest_user_authenticated');
-  currentUser = {
-    uid: 'guest_' + Math.random().toString(36).substring(2, 9),
-    name: 'Reader',
-    email: 'reader@booknest.local',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80',
-    reading_goal: 25
-  };
-  localStorage.setItem('booknest_user', JSON.stringify(currentUser));
+  localStorage.removeItem('booknest_user');
+  localStorage.removeItem('booknest_streak');
+  currentUser = { ...GUEST_USER };
+  libraryBooks = [];
   updateUserUI();
-  showToast('👋 You have been logged out.');
-  loadLibrary();
+  updateDashboardStats([]);
+  updateDashboardView();
+  filterLibrary();
   loadProfile();
+  showToast('👋 You have been logged out.');
 }
 
 function initAuthUI() {
@@ -313,12 +326,13 @@ function initAuthUI() {
 }
 
 async function performGoogleLogin(name, email, avatar) {
-  const uid = 'google_' + btoa(email.toLowerCase()).substring(0, 16);
+  const uid = 'google_' + btoa((email || name).toLowerCase()).substring(0, 16);
   const payload = {
     uid: uid,
     name: name,
     email: email,
-    avatar: avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`
+    avatar: avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`,
+    reading_goal: 25
   };
 
   try {
@@ -327,15 +341,16 @@ async function performGoogleLogin(name, email, avatar) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    currentUser = { ...currentUser, ...payload };
+    currentUser = { ...payload };
     localStorage.setItem('booknest_user', JSON.stringify(currentUser));
     localStorage.setItem('booknest_user_authenticated', 'true');
     updateUserUI();
-    authModal.close();
+    authModal?.close();
     showToast(`✅ Welcome, ${currentUser.name}! Signed in with Google`);
-    loadLibrary();
-    loadProfile();
+    await loadLibrary();
+    await loadProfile();
   } catch (err) {
+    console.error('Google sign-in error:', err);
     showToast('⚠️ Could not complete Google sign-in');
   }
 }
@@ -1693,14 +1708,14 @@ async function loadProfile() {
     const goal = profile.reading_goal || currentUser.reading_goal || 25;
 
     // Calculate total reading hours from saved books
-    const totalMinutes = libraryBooks.reduce((sum, b) => sum + (b.reading_minutes || 0), 0) + 90;
+    const totalMinutes = libraryBooks.reduce((sum, b) => sum + (b.reading_minutes || 0), 0);
     const readingHours = (totalMinutes / 60).toFixed(1);
 
     if (totalEl) totalEl.textContent = totalBooks;
     if (compEl) compEl.textContent = completedBooks;
     if (scansEl) scansEl.textContent = profile.total_scans || 0;
     if (goalEl) goalEl.textContent = `${completedBooks} / ${goal}`;
-    if (streakEl) streakEl.textContent = localStorage.getItem('booknest_streak') || '5';
+    if (streakEl) streakEl.textContent = localStorage.getItem('booknest_streak') || '0';
     if (hoursEl) hoursEl.textContent = `${readingHours}h`;
     if (goalInput) goalInput.value = goal;
     if (modeBadge) modeBadge.textContent = profile.backend_mode || 'SQLite Mirror';
@@ -1892,8 +1907,8 @@ function updateDashboardView() {
   if (heroAvatar) heroAvatar.src = currentUser.avatar;
 
   // Streak
-  const streak = parseInt(localStorage.getItem('booknest_streak') || '3');
-  if (streakText) streakText.textContent = `${streak} Day Streak 🔥`;
+  const streak = parseInt(localStorage.getItem('booknest_streak') || '0');
+  if (streakText) streakText.textContent = `${streak} Day Streak ${streak > 0 ? '🔥' : '🌱'}`;
 
   // Quote of the Day
   if (quoteEl) {
@@ -1929,8 +1944,8 @@ function updateDashboardView() {
   if (miniGoalFill) miniGoalFill.style.width = `${goalPct}%`;
 
   const streakBadge = document.getElementById('mcard-streak-badge');
-  const streakDays = localStorage.getItem('booknest_streak') || '5';
-  if (streakBadge) streakBadge.textContent = `${streakDays} Day Streak 🔥`;
+  const streakDays = localStorage.getItem('booknest_streak') || '0';
+  if (streakBadge) streakBadge.textContent = `${streakDays} Day Streak ${streakDays > 0 ? '🔥' : '🌱'}`;
 
   initMetricsCarousel();
 
@@ -2401,7 +2416,7 @@ async function finishTimerSession() {
   }
 
   // Update streak in localStorage
-  const currentStreak = parseInt(localStorage.getItem('booknest_streak') || '3') + 1;
+  const currentStreak = parseInt(localStorage.getItem('booknest_streak') || '0') + 1;
   localStorage.setItem('booknest_streak', currentStreak);
 
   // Send session log to server
@@ -2628,7 +2643,7 @@ function checkDailyAttractionNotification() {
 }
 
 function sendDailyAttractionNotification() {
-  const streak = parseInt(localStorage.getItem('booknest_streak') || '3');
+  const streak = parseInt(localStorage.getItem('booknest_streak') || '0');
   const readingBook = libraryBooks.find(b => (b.status || '').toLowerCase() === 'reading');
   const wishlistBook = libraryBooks.find(b => {
     const s = (b.status || '').toLowerCase();
