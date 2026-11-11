@@ -672,15 +672,15 @@
           </div>
         </div>
 
-        <!-- Edit Profile Form -->
+        <!-- Edit Profile Form (Auto-Saved) -->
         <div class="profile-edit-box 3d-card">
-          <div class="form-row">
-            <label class="field-micro-label">Your Name:</label>
+          <div class="form-row" style="margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="field-micro-label" style="margin-bottom: 0;">Your Name:</label>
+              <span id="profile-autosave-indicator" style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; opacity: 0; transition: opacity 0.3s ease;">✓ Auto-saved</span>
+            </div>
             <input type="text" id="edit-profile-name" class="profile-input" placeholder="Enter your name">
           </div>
-          <button id="save-profile-btn" class="btn-primary 3d-btn-primary" style="margin-top: 10px;">
-            💾 Save Profile Settings
-          </button>
         </div>
       </div>
     </section>

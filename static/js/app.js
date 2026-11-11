@@ -103,8 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Save profile settings
-  document.getElementById('save-profile-btn')?.addEventListener('click', saveProfileSettings);
+  // Auto-save profile on name or reading goal changes
+  initProfileAutoSave();
 });
 
 // =========================================================
@@ -397,14 +397,28 @@ async function handleAvatarFileUpload(e) {
   }
 }
 
-async function saveProfileSettings() {
-  const name = document.getElementById('edit-profile-name').value.trim();
-  const goal = parseInt(document.getElementById('edit-reading-goal').value) || 25;
+let profileAutoSaveTimer = null;
+
+async function autoSaveProfile(showToastMsg = false) {
+  clearTimeout(profileAutoSaveTimer);
+  const nameInput = document.getElementById('edit-profile-name');
+  const goalInput = document.getElementById('edit-reading-goal');
+
+  const name = nameInput ? nameInput.value.trim() : '';
+  const goal = parseInt(goalInput?.value) || 25;
 
   if (name) currentUser.name = name;
   currentUser.reading_goal = goal;
   localStorage.setItem('booknest_user', JSON.stringify(currentUser));
   updateUserUI();
+  updateGoalProgressBar();
+
+  const indicator = document.getElementById('profile-autosave-indicator');
+  if (indicator) {
+    indicator.textContent = 'Saving...';
+    indicator.style.opacity = '1';
+    indicator.style.color = 'var(--accent-primary)';
+  }
 
   try {
     await fetch('/api/profile', {
@@ -415,10 +429,57 @@ async function saveProfileSettings() {
       },
       body: JSON.stringify({ name: currentUser.name, reading_goal: goal })
     });
-    showToast('💾 Profile settings saved!');
-    loadProfile();
+
+    if (indicator) {
+      indicator.textContent = '✓ Saved';
+      indicator.style.color = '#10b981';
+      setTimeout(() => {
+        indicator.style.opacity = '0';
+      }, 1800);
+    }
+    if (showToastMsg) {
+      showToast('✓ Profile updated');
+    }
   } catch (e) {
-    showToast('⚠️ Error saving settings');
+    console.error('Error auto-saving profile:', e);
+    if (indicator) {
+      indicator.textContent = '⚠️ Sync error';
+      indicator.style.color = '#ef4444';
+    }
+  }
+}
+
+function triggerProfileAutoSave() {
+  clearTimeout(profileAutoSaveTimer);
+  const indicator = document.getElementById('profile-autosave-indicator');
+  if (indicator) {
+    indicator.textContent = 'Typing...';
+    indicator.style.opacity = '1';
+    indicator.style.color = 'var(--text-muted)';
+  }
+  profileAutoSaveTimer = setTimeout(() => {
+    autoSaveProfile(false);
+  }, 650);
+}
+
+function initProfileAutoSave() {
+  const profileNameInput = document.getElementById('edit-profile-name');
+  if (profileNameInput) {
+    profileNameInput.addEventListener('input', triggerProfileAutoSave);
+    profileNameInput.addEventListener('change', () => autoSaveProfile(true));
+    profileNameInput.addEventListener('blur', () => autoSaveProfile(false));
+  }
+
+  const readingGoalInput = document.getElementById('edit-reading-goal');
+  if (readingGoalInput) {
+    readingGoalInput.addEventListener('input', () => {
+      updateGoalProgressBar();
+      triggerProfileAutoSave();
+    });
+    readingGoalInput.addEventListener('change', () => {
+      updateGoalProgressBar();
+      autoSaveProfile(true);
+    });
   }
 }
 
@@ -2087,12 +2148,13 @@ function initTimerEvents() {
     onTimerBookSelected(e.target.value);
   });
 
-  // Reading Goal Stepper Buttons in Profile
+  // Reading Goal Stepper Buttons in Profile (with instant auto-save)
   document.getElementById('goal-minus-btn')?.addEventListener('click', () => {
     const input = document.getElementById('edit-reading-goal');
     if (input) {
       input.value = Math.max(1, (parseInt(input.value) || 25) - 5);
       updateGoalProgressBar();
+      autoSaveProfile(false);
     }
   });
 
@@ -2101,6 +2163,7 @@ function initTimerEvents() {
     if (input) {
       input.value = Math.min(500, (parseInt(input.value) || 25) + 5);
       updateGoalProgressBar();
+      autoSaveProfile(false);
     }
   });
 }
