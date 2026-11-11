@@ -77,17 +77,25 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  height: 100%;
+  overflow-x: hidden;
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--bg-primary);
   color: var(--text-main);
-  min-height: 100vh;
+  min-height: 100%;
+  min-height: 100dvh;
   min-height: -webkit-fill-available;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
   position: relative;
   transition: background 0.3s ease, color 0.3s ease;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Luxury pearlescent background glow */
@@ -110,6 +118,7 @@ body::before {
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -120,9 +129,11 @@ body::before {
   z-index: 1;
 }
 
-/* ---------- TOP HEADER ---------- */
+/* ---------- TOP HEADER (FIXED & NON-SCROLLABLE) ---------- */
 .app-header {
   height: 64px;
+  min-height: 64px;
+  max-height: 64px;
   padding: 0 18px;
   display: flex;
   align-items: center;
@@ -130,11 +141,16 @@ body::before {
   background: var(--bg-nav);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 50;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 75;
   border-bottom: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
 }
 
 .brand-wrapper {
@@ -255,7 +271,7 @@ body::before {
 .tab-content {
   display: none;
   flex: 1;
-  padding: 16px 16px calc(88px + var(--safe-bottom));
+  padding: calc(64px + 14px) 16px calc(76px + var(--safe-bottom));
   opacity: 0;
   transform: translateY(8px) scale(0.995);
   transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
@@ -396,13 +412,14 @@ body::before {
 
 /* ---------- GOOGLE LENS CAMERA VIEWPORT & HUD ---------- */
 #tab-scan {
-  height: calc(100dvh - 64px);
-  min-height: 0;
-  padding: 8px 12px calc(76px + var(--safe-bottom));
+  height: 100dvh;
+  min-height: 100dvh;
+  padding: calc(64px + 8px) 12px calc(64px + var(--safe-bottom) + 8px);
   display: none;
   flex-direction: column;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 #tab-scan.active {
@@ -416,7 +433,7 @@ body::before {
   min-height: 0;
   max-height: none;
   background: #000;
-  border-radius: 26px;
+  border-radius: 24px;
   overflow: hidden;
   position: relative;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
@@ -428,11 +445,12 @@ body::before {
 
 @media (max-width: 600px) {
   #tab-scan {
-    height: calc(100dvh - 64px);
-    padding: 6px 10px calc(72px + var(--safe-bottom));
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: calc(64px + 6px) 8px calc(64px + var(--safe-bottom) + 6px);
   }
   .scanner-viewport {
-    border-radius: 24px;
+    border-radius: 20px;
   }
 }
 
@@ -2186,7 +2204,7 @@ dialog::backdrop {
   transform: scale(1.05);
 }
 
-/* ---------- BOTTOM NAVIGATION ---------- */
+/* ---------- BOTTOM NAVIGATION (FIXED & NON-SCROLLABLE) ---------- */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -2203,8 +2221,9 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  z-index: 50;
+  z-index: 75;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 .nav-item {
@@ -3172,7 +3191,7 @@ dialog::backdrop {
 .floating-ai-fab {
   position: fixed;
   bottom: calc(76px + var(--safe-bottom, 12px));
-  right: 18px;
+  right: calc(50% - 240px + 18px);
   width: 58px;
   height: 58px;
   border-radius: 50%;
@@ -3182,7 +3201,7 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 70;
   cursor: pointer;
   outline: none;
   padding: 0;
@@ -3190,6 +3209,12 @@ dialog::backdrop {
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+@media (max-width: 480px) {
+  .floating-ai-fab {
+    right: 18px;
+  }
 }
 
 .floating-ai-fab:active {
