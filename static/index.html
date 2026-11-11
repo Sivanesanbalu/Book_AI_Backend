@@ -176,6 +176,9 @@
           <!-- Populated dynamically with Wishlist books -->
         </div>
 
+        <!-- Carousel Pagination Dots ("Point Dot Mathiri") -->
+        <div id="wishlist-dots-container" class="wishlist-carousel-dots" style="display: none;"></div>
+
         <div id="no-wishlist-placeholder" class="no-reading-state" style="display: none; padding: 18px 10px;">
           <div style="font-size: 1.6rem; margin-bottom: 4px;">⭐</div>
           <div style="font-weight: 700; font-size: 0.88rem;">Your Wishlist is Empty</div>
@@ -868,6 +871,9 @@
       </div>
     </dialog>
 
+    <!-- Backdrop for Drawer -->
+    <div id="chat-backdrop" class="drawer-backdrop"></div>
+
     <!-- ==========================================
          SIDE CHATBOT DRAWER (AI STORYTELLER)
          ========================================== -->
@@ -943,20 +949,34 @@
     </nav>
 
     <!-- ==========================================
-         FLOATING AI BOT (LOTTIE ANIMATION FAB)
+         FLOATING AI BOT (ANIMATED GLOWING ROBOT FAB)
          ========================================== -->
-    <button id="floating-ai-bot" class="floating-ai-fab" title="Chat with AI Book Bot" aria-label="Open AI Assistant">
+    <button id="floating-ai-bot" class="floating-ai-fab" type="button" title="Chat with AI Book Bot" aria-label="Open AI Assistant">
       <div class="fab-bot-pulse"></div>
-      <div class="fab-lottie-container">
-        <lottie-player 
-          src="https://assets3.lottiefiles.com/packages/lf20_tijbafky.json" 
-          background="transparent" 
-          speed="1" 
-          style="width: 52px; height: 52px;" 
-          loop 
-          autoplay>
-        </lottie-player>
-        <span class="fab-fallback-icon">🤖</span>
+      <div class="fab-bot-avatar">
+        <svg class="fab-ai-svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Antenna -->
+          <circle class="ai-antenna-dot" cx="24" cy="6" r="3" fill="#6366f1"/>
+          <line x1="24" y1="9" x2="24" y2="15" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Robot Face Body -->
+          <rect x="8" y="15" width="32" height="25" rx="8" fill="url(#aiBotGrad)" stroke="#4f46e5" stroke-width="1.8"/>
+          <!-- Digital Visor Screen -->
+          <rect x="13" y="21" width="22" height="9" rx="4.5" fill="#0f172a"/>
+          <!-- Glowing Eyes -->
+          <circle class="ai-eye left" cx="18.5" cy="25.5" r="2.4" fill="#38bdf8"/>
+          <circle class="ai-eye right" cx="29.5" cy="25.5" r="2.4" fill="#38bdf8"/>
+          <!-- Happy Smile Line -->
+          <path d="M20 34.5c1.2 1.2 2.6 1.8 4 1.8s2.8-.6 4-1.8" stroke="#4f46e5" stroke-width="2" stroke-linecap="round"/>
+          <!-- Ear Pegs -->
+          <rect x="4.5" y="23" width="3.5" height="8" rx="1.5" fill="#818cf8"/>
+          <rect x="40" y="23" width="3.5" height="8" rx="1.5" fill="#818cf8"/>
+          <defs>
+            <linearGradient id="aiBotGrad" x1="8" y1="15" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ffffff"/>
+              <stop offset="100%" stop-color="#e0e7ff"/>
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
       <span class="fab-badge-glow">AI</span>
     </button>

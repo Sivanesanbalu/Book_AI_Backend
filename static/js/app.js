@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
   registerPWA();
   checkFirstTimeUser();
   initDailyReminderNotification();
+  initAiBot();
 
   // Shutter action
   if (shutterBtn) shutterBtn.addEventListener('click', captureAndScan);
@@ -74,9 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (profileThemeBtn) profileThemeBtn.addEventListener('click', toggleTheme);
 
   // Chat close
-  document.getElementById('close-chat-btn')?.addEventListener('click', () => {
-    chatDrawer.classList.remove('open');
-  });
+  document.getElementById('close-chat-btn')?.addEventListener('click', closeChatDrawer);
+  document.getElementById('chat-backdrop')?.addEventListener('click', closeChatDrawer);
 
   // Chat send
   document.getElementById('chat-form')?.addEventListener('submit', (e) => {
@@ -1245,29 +1245,71 @@ function openChatForBook(book) {
   activeBook = book;
   chatHistory = [];
 
-  document.getElementById('drawer-book-title').textContent = book.title;
-  document.getElementById('drawer-genre-tag').textContent = book.genre || 'Fiction';
-
+  const titleEl = document.getElementById('drawer-book-title');
+  const tagEl = document.getElementById('drawer-genre-tag');
   const scenarioDesc = document.getElementById('drawer-scenario-desc');
-  if (book.scenario && book.scenario.story_narrative) {
-    scenarioDesc.textContent = book.scenario.story_narrative;
-  } else {
-    scenarioDesc.textContent = book.overview || `A gripping narrative by ${book.author}. Tap below to discover the scenario, story, and takeaways!`;
+  const messagesList = document.getElementById('chat-messages-list');
+  const chatBackdrop = document.getElementById('chat-backdrop');
+
+  if (titleEl) titleEl.textContent = book.title;
+  if (tagEl) tagEl.textContent = book.genre || 'Fiction';
+
+  if (scenarioDesc) {
+    if (book.scenario && book.scenario.story_narrative) {
+      scenarioDesc.textContent = book.scenario.story_narrative;
+    } else {
+      scenarioDesc.textContent = book.overview || `A gripping narrative by ${book.author || 'Author'}. Tap below to discover the scenario, story, and takeaways!`;
+    }
   }
 
-  const messagesList = document.getElementById('chat-messages-list');
-  messagesList.innerHTML = `
-    <div class="msg-row ai">
-      <div class="msg-avatar avatar-ai">AI</div>
-      <div class="msg-bubble">
-        Hello! I am your <strong>BookNest AI</strong> reading companion.
-        <br><br>
-        Ask me anything about the background, scenario, storyline, or key life takeaways from <strong>'${escapeHtml(book.title)}'</strong>!
+  if (messagesList) {
+    messagesList.innerHTML = `
+      <div class="msg-row ai">
+        <div class="msg-avatar avatar-ai">AI</div>
+        <div class="msg-bubble">
+          Hello! I am your <strong>BookNest AI</strong> reading companion.
+          <br><br>
+          Ask me anything about the background, scenario, storyline, or key life takeaways from <strong>'${escapeHtml(book.title)}'</strong>!
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  }
 
-  chatDrawer.classList.add('open');
+  if (chatDrawer) chatDrawer.classList.add('open');
+  if (chatBackdrop) chatBackdrop.classList.add('open');
+}
+
+function closeChatDrawer() {
+  if (chatDrawer) chatDrawer.classList.remove('open');
+  const chatBackdrop = document.getElementById('chat-backdrop');
+  if (chatBackdrop) chatBackdrop.classList.remove('open');
+}
+
+function initAiBot() {
+  const fab = document.getElementById('floating-ai-bot');
+  if (fab) {
+    fab.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openGeneralAiBot();
+    };
+  }
+
+  const closeBtn = document.getElementById('close-chat-btn');
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.preventDefault();
+      closeChatDrawer();
+    };
+  }
+
+  const backdrop = document.getElementById('chat-backdrop');
+  if (backdrop) {
+    backdrop.onclick = (e) => {
+      e.preventDefault();
+      closeChatDrawer();
+    };
+  }
 }
 
 async function sendMessage() {
@@ -1620,9 +1662,61 @@ function updateDashboardView() {
           </button>
         </div>
       `).join('');
+
+      // Populate Wishlist Carousel Pagination Dots ("Point Dot Mathiri")
+      const dotsContainer = document.getElementById('wishlist-dots-container');
+      if (dotsContainer) {
+        if (wishlistBooks.length > 1) {
+          dotsContainer.style.display = 'flex';
+          const maxDots = Math.min(wishlistBooks.length, 8);
+          dotsContainer.innerHTML = Array.from({ length: maxDots }, (_, i) => `
+            <span class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot-idx="${i}"></span>
+          `).join('');
+
+          // Click dot to smooth scroll
+          dotsContainer.querySelectorAll('.carousel-dot').forEach(dot => {
+            dot.onclick = (e) => {
+              e.stopPropagation();
+              const idx = parseInt(dot.getAttribute('data-dot-idx'));
+              const cardWidth = 167; // 155px card + 12px gap
+              wishContainer.scrollTo({
+                left: idx * cardWidth,
+                behavior: 'smooth'
+              });
+              const dots = dotsContainer.querySelectorAll('.carousel-dot');
+              dots.forEach((d, di) => {
+                if (di === idx) d.classList.add('active');
+                else d.classList.remove('active');
+              });
+            };
+          });
+        } else {
+          dotsContainer.style.display = 'none';
+        }
+      }
+
+      // Attach scroll listener once
+      if (!wishContainer._hasScrollSpy) {
+        wishContainer._hasScrollSpy = true;
+        wishContainer.addEventListener('scroll', () => {
+          const scrollLeft = wishContainer.scrollLeft;
+          const cardWidth = 167;
+          const dots = document.querySelectorAll('#wishlist-dots-container .carousel-dot');
+          if (dots.length > 0) {
+            const activeIdx = Math.min(dots.length - 1, Math.max(0, Math.round(scrollLeft / cardWidth)));
+            dots.forEach((d, i) => {
+              if (i === activeIdx) d.classList.add('active');
+              else d.classList.remove('active');
+            });
+          }
+        }, { passive: true });
+      }
+
     } else {
       wishContainer.style.display = 'none';
       if (noWishPlaceholder) noWishPlaceholder.style.display = 'block';
+      const dotsContainer = document.getElementById('wishlist-dots-container');
+      if (dotsContainer) dotsContainer.style.display = 'none';
     }
   }
 }

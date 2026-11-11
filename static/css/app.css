@@ -2064,24 +2064,49 @@ dialog::backdrop {
   border-color: var(--accent-primary);
 }
 
-/* ---------- SIDE CHATBOT DRAWER ---------- */
+/* ---------- SIDE CHATBOT DRAWER & BACKDROP ---------- */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 110;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .chat-drawer {
   position: fixed;
   top: 0;
-  right: -100%;
+  right: calc(50% - 240px);
   width: 100%;
-  max-width: 440px;
+  max-width: 480px;
   height: 100%;
   background: var(--bg-surface);
   box-shadow: -10px 0 35px rgba(0, 0, 0, 0.25);
-  z-index: 100;
+  z-index: 120;
   display: flex;
   flex-direction: column;
-  transition: right 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  transform: translateX(105%);
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .chat-drawer.open {
-  right: 0;
+  transform: translateX(0);
+}
+
+@media (max-width: 480px) {
+  .chat-drawer {
+    right: 0;
+    max-width: 100%;
+  }
 }
 
 .chat-header {
@@ -2351,17 +2376,48 @@ dialog::backdrop {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding: 8px 2px 14px 2px;
+  padding: 8px 4px 6px 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
 }
 
 .wishlist-scroll-row::-webkit-scrollbar {
   display: none;
 }
 
+/* Carousel Pagination Dots ("Point Dot Mathiri") */
+.wishlist-carousel-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0 2px;
+}
+
+.carousel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.16);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .carousel-dot {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.carousel-dot.active {
+  width: 22px;
+  border-radius: 999px;
+  background: var(--accent-primary);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
 .wishlist-card {
-  flex: 0 0 140px;
+  flex: 0 0 155px;
+  scroll-snap-align: center;
   background: var(--bg-surface);
   border: 1px solid var(--border-card);
   border-radius: 16px;
@@ -3336,19 +3392,51 @@ dialog::backdrop {
   }
 }
 
-.fab-lottie-container {
+.fab-bot-avatar {
   width: 100%;
   height: 100%;
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
 }
 
-.fab-fallback-icon {
-  font-size: 1.8rem;
-  display: none; /* Shown if lottie fails */
+.fab-ai-svg {
+  width: 38px;
+  height: 38px;
+  filter: drop-shadow(0 2px 6px rgba(99, 102, 241, 0.3));
+}
+
+.ai-antenna-dot {
+  animation: aiAntennaPulse 2s ease-in-out infinite;
+  transform-origin: 24px 6px;
+}
+
+@keyframes aiAntennaPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}
+
+.ai-eye {
+  animation: aiEyeBlink 3.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes aiEyeBlink {
+  0%, 90%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  95% {
+    transform: scaleY(0.1);
+    opacity: 0.6;
+  }
 }
 
 .fab-badge-glow {
