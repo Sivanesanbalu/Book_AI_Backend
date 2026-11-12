@@ -2116,6 +2116,129 @@ dialog::backdrop {
   border-color: var(--accent-primary);
 }
 
+/* Custom Photo Upload 3D Action Card */
+.upload-photo-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1.5px dashed var(--accent-primary);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.upload-photo-card-btn:hover,
+.upload-photo-card-btn:active {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(168, 85, 247, 0.06));
+  border-color: var(--accent-secondary);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.upload-photo-icon-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.18));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+  transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease;
+}
+
+.upload-photo-card-btn:hover .upload-photo-icon-circle,
+.upload-photo-card-btn:active .upload-photo-icon-circle {
+  transform: scale(1.08) rotate(-4deg);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: #ffffff;
+}
+
+.upload-photo-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-photo-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.upload-photo-sub {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.upload-photo-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.upload-photo-card-btn:hover .upload-photo-badge,
+.upload-photo-card-btn:active .upload-photo-badge {
+  transform: translateY(-2px);
+  background: var(--accent-primary);
+  color: #ffffff;
+}
+
+/* Profile Tab Upload Pill Button */
+.profile-upload-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.profile-upload-pill-btn:hover,
+.profile-upload-pill-btn:active {
+  transform: translateY(-1px) scale(1.02);
+  background: var(--accent-primary);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+}
+
+.profile-avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 /* ---------- SIDE CHATBOT DRAWER & BACKDROP ---------- */
 .drawer-backdrop {
   position: fixed;

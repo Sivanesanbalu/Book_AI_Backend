@@ -305,7 +305,7 @@
             <div class="cam-icon-circle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
             </div>
-            <span>Gallery</span>
+            <span>Upload Photo</span>
           </button>
           <input type="file" id="photo-input" accept="image/*" style="display: none;">
 
@@ -615,6 +615,13 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M3 4V1h2v3h3v2H5v3H3V6H0V4h3zm3 6V7h3V4h7l1.83 2H21c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V10h3zm7 9c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-3.2-5c0 1.77 1.43 3.2 3.2 3.2s3.2-1.43 3.2-3.2-1.43-3.2-3.2-3.2-3.2 1.43-3.2 3.2z"/></svg>
             </div>
           </div>
+          <button type="button" class="profile-upload-pill-btn" id="profile-avatar-upload-trigger" title="Upload new photo from your device">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <span>Upload Photo</span>
+          </button>
           <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
         </div>
 
@@ -948,8 +955,24 @@
         </div>
 
         <div style="margin-top: 14px;">
-          <button id="upload-custom-avatar-btn" class="btn-secondary" style="width: 100%;">
-            📷 Upload My Own Photo
+          <button type="button" id="upload-custom-avatar-btn" class="upload-photo-card-btn 3d-card" style="width: 100%;">
+            <div class="upload-photo-icon-circle">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </div>
+            <div class="upload-photo-text">
+              <span class="upload-photo-title">Upload Custom Photo</span>
+              <span class="upload-photo-sub">PNG, JPG or camera selfie</span>
+            </div>
+            <div class="upload-photo-badge">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
           </button>
         </div>
       </div>

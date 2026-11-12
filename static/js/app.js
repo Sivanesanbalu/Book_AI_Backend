@@ -337,7 +337,9 @@ function initAuthUI() {
   });
 
   // Avatar file upload triggers
+  const profileAvatarUploadTrigger = document.getElementById('profile-avatar-upload-trigger');
   changeAvatarBtn?.addEventListener('click', () => avatarFileInput.click());
+  profileAvatarUploadTrigger?.addEventListener('click', () => avatarFileInput.click());
   uploadCustomAvatarBtn?.addEventListener('click', () => avatarFileInput.click());
 
   avatarFileInput?.addEventListener('change', handleAvatarFileUpload);
