@@ -192,18 +192,71 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void exitApp() {
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    activity.finish();
+                }
+            });
+        }
+
+        @JavascriptInterface
         public boolean isNativeApp() {
             return true;
         }
     }
 
     @Override
-    public void onBackPressed() {
-        if (mWebView != null && mWebView.canGoBack()) {
-            mWebView.goBack();
-        } else {
-            super.onBackPressed();
+    protected void onResume() {
+        super.onResume();
+        if (mWebView != null) {
+            mWebView.evaluateJavascript("if (typeof window.redirectToHomePage === 'function') { window.redirectToHomePage(); }", null);
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (mWebView != null) {
+            mWebView.evaluateJavascript(
+                "(function() {" +
+                "  if (typeof window.handleAppBackPress === 'function') {" +
+                "    return window.handleAppBackPress();" +
+                "  }" +
+                "  return 'unhandled';" +
+                "})();",
+                new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String value) {
+                        if ("\"unhandled\"".equals(value) || value == null || "null".equals(value)) {
+                            showNativeExitDialog();
+                        }
+                    }
+                }
+            );
+        } else {
+            showNativeExitDialog();
+        }
+    }
+
+    private void showNativeExitDialog() {
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Exit BookNest AI")
+            .setMessage("Are you sure you want to exit? Your books and reading progress are safely preserved.")
+            .setPositiveButton("Exit", new android.content.DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(android.content.DialogInterface dialog, int which) {
+                    finish();
+                }
+            })
+            .setNegativeButton("Keep Reading", new android.content.DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(android.content.DialogInterface dialog, int which) {
+                    dialog.dismiss();
+                }
+            })
+            .setCancelable(true)
+            .show();
     }
 
     static class AppWebViewClient extends WebViewClient {

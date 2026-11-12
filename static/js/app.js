@@ -224,7 +224,9 @@ function checkFirstTimeUser() {
 function updateUserUI() {
   const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
   const headerAvatar = document.getElementById('header-avatar');
+  const headerGoogleIcon = document.getElementById('header-google-icon');
   const headerName = document.getElementById('header-user-name');
+  const headerSwitchBadge = document.getElementById('header-switch-badge');
   const profileAvatar = document.getElementById('profile-avatar-img');
   const profileName = document.getElementById('profile-name');
   const profileEmail = document.getElementById('profile-email');
@@ -232,6 +234,10 @@ function updateUserUI() {
   const editGoal = document.getElementById('edit-reading-goal');
   const googleLoginBtn = document.getElementById('google-login-btn');
   const loggedInActions = document.getElementById('logged-in-actions');
+
+  const dashGoogleTitle = document.getElementById('dash-google-title');
+  const dashGoogleDesc = document.getElementById('dash-google-desc');
+  const dashGooglePillBtn = document.getElementById('dash-google-pill-btn');
 
   if (headerAvatar) headerAvatar.src = currentUser.avatar;
   if (profileAvatar) profileAvatar.src = currentUser.avatar;
@@ -241,13 +247,27 @@ function updateUserUI() {
   if (editGoal) editGoal.value = currentUser.reading_goal || 25;
 
   if (isAuth) {
+    if (headerGoogleIcon) headerGoogleIcon.style.display = 'none';
+    if (headerAvatar) headerAvatar.style.display = 'inline-block';
     if (headerName) headerName.textContent = (currentUser.name || 'User').split(' ')[0] || 'Profile';
+    if (headerSwitchBadge) headerSwitchBadge.style.display = 'inline-block';
     if (googleLoginBtn) googleLoginBtn.style.display = 'none';
     if (loggedInActions) loggedInActions.style.display = 'flex';
+
+    if (dashGoogleTitle) dashGoogleTitle.textContent = `Connected: ${currentUser.name}`;
+    if (dashGoogleDesc) dashGoogleDesc.textContent = `${currentUser.email} • Tap to switch Google account`;
+    if (dashGooglePillBtn) dashGooglePillBtn.textContent = 'Switch Account 🔄';
   } else {
-    if (headerName) headerName.textContent = 'Sign In';
+    if (headerGoogleIcon) headerGoogleIcon.style.display = 'inline-block';
+    if (headerAvatar) headerAvatar.style.display = 'none';
+    if (headerName) headerName.textContent = 'Sign in with Google';
+    if (headerSwitchBadge) headerSwitchBadge.style.display = 'none';
     if (googleLoginBtn) googleLoginBtn.style.display = 'inline-flex';
     if (loggedInActions) loggedInActions.style.display = 'none';
+
+    if (dashGoogleTitle) dashGoogleTitle.textContent = 'Sign in with Google';
+    if (dashGoogleDesc) dashGoogleDesc.textContent = 'Sync your books, reading streak & library across devices';
+    if (dashGooglePillBtn) dashGooglePillBtn.textContent = 'Connect ➔';
   }
 }
 
@@ -433,14 +453,17 @@ function initAuthUI() {
     }
   });
 
-  // Header Avatar click: Jump to Profile if logged in, else open Auth Modal
-  authHeaderBtn?.addEventListener('click', () => {
-    const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
-    if (isAuth) {
-      switchToTab('tab-profile');
-    } else {
-      openNativeOrModalGoogleSignIn();
-    }
+  // Header Avatar click: ALWAYS open Google Auth Modal so user can sign in or switch account!
+  authHeaderBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openNativeOrModalGoogleSignIn();
+  });
+
+  // Home Dashboard Google Card click
+  const dashGoogleCard = document.getElementById('dash-google-card');
+  dashGoogleCard?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openNativeOrModalGoogleSignIn();
   });
 
   googleLoginBtn?.addEventListener('click', openNativeOrModalGoogleSignIn);
@@ -454,6 +477,30 @@ function initAuthUI() {
       if (authModal && authModal.open) authModal.close();
     } catch (e) {
       authModal?.removeAttribute('open');
+    }
+  });
+
+  // Exit App Confirmation Modal Handlers
+  const exitConfirmModal = document.getElementById('exit-confirm-modal');
+  const exitCancelBtn = document.getElementById('exit-cancel-btn');
+  const exitConfirmBtn = document.getElementById('exit-confirm-btn');
+
+  exitCancelBtn?.addEventListener('click', () => {
+    try {
+      if (exitConfirmModal && exitConfirmModal.open) exitConfirmModal.close();
+    } catch (e) {
+      exitConfirmModal?.removeAttribute('open');
+    }
+  });
+
+  exitConfirmBtn?.addEventListener('click', () => {
+    if (window.AndroidGoogleAuth && typeof window.AndroidGoogleAuth.exitApp === 'function') {
+      window.AndroidGoogleAuth.exitApp();
+    } else {
+      try {
+        if (exitConfirmModal && exitConfirmModal.open) exitConfirmModal.close();
+      } catch (e) {}
+      showToast('👋 You have closed BookNest AI.');
     }
   });
 
@@ -2919,3 +2966,101 @@ function sendDailyAttractionNotification() {
     try { navigator.vibrate([150, 75, 150]); } catch (e) {}
   }
 }
+
+
+// =========================================================
+// 🔙 HARDWARE BACK BUTTON & EXIT CONFIRMATION CONTROLLER
+// =========================================================
+window.handleAppBackPress = function() {
+  const exitConfirmModal = document.getElementById('exit-confirm-modal');
+
+  // 1. If Exit Modal is open, close it (cancel exit)
+  if (exitConfirmModal && exitConfirmModal.open) {
+    try { exitConfirmModal.close(); } catch (e) { exitConfirmModal.removeAttribute('open'); }
+    return 'handled';
+  }
+
+  // 2. If Auth Modal is open, close it
+  const authModal = document.getElementById('auth-modal');
+  if (authModal && authModal.open) {
+    try { authModal.close(); } catch (e) { authModal.removeAttribute('open'); }
+    return 'handled';
+  }
+
+  // 3. If Book Detail Modal is open, close it
+  const bookModal = document.getElementById('book-modal');
+  if (bookModal && bookModal.open) {
+    try { bookModal.close(); } catch (e) { bookModal.removeAttribute('open'); }
+    return 'handled';
+  }
+
+  // 4. If Congrats Modal is open, close it
+  const congratsModal = document.getElementById('congrats-modal');
+  if (congratsModal && congratsModal.open) {
+    try { congratsModal.close(); } catch (e) { congratsModal.removeAttribute('open'); }
+    return 'handled';
+  }
+
+  // 5. If AI Bot Chat Modal is active, close it
+  const chatModal = document.getElementById('bot-chat-modal');
+  if (chatModal && chatModal.classList.contains('active')) {
+    chatModal.classList.remove('active');
+    return 'handled';
+  }
+
+  // 6. If on any subpage/tab other than Home, navigate back to Home Dashboard!
+  const activeTab = document.querySelector('.tab-content.active');
+  if (activeTab && activeTab.id !== 'tab-dashboard') {
+    switchToTab('tab-dashboard');
+    return 'handled';
+  }
+
+  // 7. If ALREADY on Home (tab-dashboard), show Exit Warning Confirmation Modal!
+  if (exitConfirmModal) {
+    try {
+      if (!exitConfirmModal.open) exitConfirmModal.showModal();
+    } catch (e) {
+      exitConfirmModal.setAttribute('open', 'true');
+    }
+    return 'handled';
+  }
+
+  return 'unhandled';
+};
+
+// =========================================================
+// 🔄 APP RETURN / FOREGROUND REDIRECT TO HOME PAGE
+// =========================================================
+function redirectToHomePage() {
+  // Close any open modals
+  const openModals = document.querySelectorAll('dialog[open]');
+  openModals.forEach(m => {
+    try { m.close(); } catch (e) { m.removeAttribute('open'); }
+  });
+  const chatModal = document.getElementById('bot-chat-modal');
+  if (chatModal && chatModal.classList.contains('active')) {
+    chatModal.classList.remove('active');
+  }
+
+  // Switch to Home Dashboard tab
+  switchToTab('tab-dashboard');
+}
+window.redirectToHomePage = redirectToHomePage;
+
+// When user returns to the app from background or another app
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    console.log('📱 App returned to foreground: redirecting to Home Dashboard');
+    redirectToHomePage();
+  }
+});
+
+window.addEventListener('focus', () => {
+  console.log('📱 Window regained focus: redirecting to Home Dashboard');
+  redirectToHomePage();
+});
+
+window.addEventListener('pageshow', (event) => {
+  console.log('📱 Page show event triggered: redirecting to Home Dashboard');
+  redirectToHomePage();
+});
