@@ -1,230 +1,271 @@
 # 📚 BookNest AI — Visual Book Scanner & Story Assistant
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![Groq Vision AI](https://img.shields.io/badge/Groq%20AI-Vision%20%26%20Llama-F55036.svg)](https://groq.com)
-[![SQLite WAL](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg?logo=sqlite&logoColor=white)](https://sqlite.org)
-[![Android](https://img.shields.io/badge/Android-APK%20Native%20WebView-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Sivanesanbalu/Book_AI_Backend/main/static/icons/icon-512.png" width="110" height="110" alt="BookNest AI Logo" style="border-radius: 28px; box-shadow: 0 10px 30px rgba(99,102,241,0.25);" />
+</p>
 
-An intelligent, mobile-first book scanner and personal reading companion featuring a **1,005+ book preloaded catalog**, **Groq Multimodal Vision AI**, an interactive **Reading Stopwatch**, an **interactive swipe carousel with pagination dots**, and a **freely draggable Vector AI Companion Bot**.
+<p align="center">
+  <strong>An Intelligent, Mobile-First Vision Book Scanner, Personal Reading Tracker & Groq AI Storyteller</strong>
+</p>
 
----
-
-## 🔗 Live Access & Downloads
-
-- 💻 **Desktop Web App**: [http://localhost:8000](http://localhost:8000)
-- 📱 **Mobile Cloudflare HTTPS Tunnel**: [https://connector-fixes-mitsubishi-mac.trycloudflare.com](https://connector-fixes-mitsubishi-mac.trycloudflare.com)
-- 📥 **Android Release APK**: [Download BookNest AI Release APK](https://github.com/Sivanesanbalu/Book_AI_Backend/releases/download/v1.0.0/BookNestAI-release.apk)
-
----
-
-## 🌟 Key Features
-
-### 1. 📸 Google Lens Camera HUD & Vision AI Scanner
-- **Neural Multimodal Vision**: Point your phone camera or webcam at physical book covers; powered by Groq's high-speed vision AI (`qwen/qwen3.8-27b`).
-- **Sci-Fi Google Lens HUD**: Features neon cyan/indigo corner brackets, an animated scanning laser sweep, and a rotating central focus reticle.
-- **Haptic & Visual Feedback**: Integrated shutter haptics (`navigator.vibrate(50)`) and flash effect on capture.
-- **Instant Library Check**: Checks if a book is already in your personal collection with a 1-tap shortcut to view it.
-- **"Scan Another Book" Action**: Seamless 1-tap reset to dismiss the result card and immediately continue scanning.
-- **Distraction-Free Framing**: Floating AI bot automatically hides while the camera scanner is active to ensure unobstructed view.
-
-### 2. 🎠 Dashboard Metrics Swipe Carousel with Pagination Dots
-- **Horizontal Snap Carousel**: Four high-priority reading metric cards placed directly beneath the greeting header:
-  1. 📚 **Collection Overview**: Total books saved with 1-tap shortcut to full library.
-  2. 🔥 **Reading Now & Live Streak**: Active reading count with live streak flame indicator.
-  3. 🎉 **2026 Goal Progress**: Completed book count with goal badge and animated mini progress bar.
-  4. ⏱️ **Focus Time**: Total accumulated reading time with quick link to Stopwatch.
-- **Interactive Carousel Dots**: 4 pagination dots morph dynamically (active dot expands into a 24px glowing pill) as you swipe left/right, with 1:1 tap-to-scroll navigation.
-
-### 3. ⭐ Reading Wishlist Shelf with Dynamic Pagination
-- **Horizontal Shelf Preview**: Displays top Wishlist books with physical 3D card tilt and direct `▶ Start Read` actions.
-- **Interactive Carousel Dots**: Dedicated pagination dots track and center cards smoothly with 1:1 scroll synchronization.
-- **Curated "+ More Books" Card**: Directly routes users with larger wishlists to the dedicated Library Wishlist filter.
-
-### 4. 🤖 Freely Draggable Vector AI Companion Bot
-- **Clean Vector Character**: Minimalist animated robot companion with soft drop shadow (no background container circles).
-- **Smooth Pointer Capture Dragging**: Smooth HTML5 Pointer Events (`setPointerCapture`) allow dragging the bot anywhere on screen on both touch and mouse.
-- **Position Persistence**: Automatically remembers user's preferred screen position in `localStorage` (`booknest_ai_bot_pos`).
-- **Contextual Speech Bubble**: Offers reading encouragement, daily recommendations, and launches interactive book chats.
-
-### 5. ⏱️ Reading Stopwatch & Live Page Tracker
-- **A to Z Book Selection**: Alphabetically sorted dropdown with status and progress badges for easy book picking.
-- **Flexible Stopwatch**: Freeform stopwatch or preset durations (15m, 25m Pomodoro, 45m Deep Work, 60m Marathon).
-- **Live Page Counter**: Input start and end pages to see instant pages-read delta calculation.
-- **Celebration Modal**: Full-screen confetti cannon animation on completing books or reading milestones.
-
-### 6. 📚 1,005 Preloaded Books across 9 Categories
-Explore and filter a curated master catalog of **1,005 books**:
-- 💥 **Comics**: Spider-Man, Batman, Watchmen, Sandman, Tintin, Asterix
-- 🎌 **Manga**: One Piece, Naruto, Bleach, Attack on Titan, Death Note, Demon Slayer
-- 📚 **Fiction**: Harry Potter, Lord of the Rings, 1984, To Kill a Mockingbird
-- 🚀 **Sci-Fi & Fantasy**: Dune, Foundation, Neuromancer, Three-Body Problem
-- 💡 **Self-Help**: Atomic Habits, Deep Work, Think & Grow Rich, Ikigai
-- 💻 **Technology & Code**: Clean Code, Pragmatic Programmer, Designing Data-Intensive Apps
-- 🕵️ **Mystery & Thriller**: Sherlock Holmes, Da Vinci Code, Gone Girl, Agatha Christie
-- 📜 **History & Bio**: Sapiens, Steve Jobs, Wings of Fire, Ponniyin Selvan
-- 💼 **Business & Finance**: Zero to One, Psychology of Money, The Intelligent Investor
-
-### 7. ⚪ Clean White Porcelain 3D Luxury Design
-- Modern porcelain white glassmorphic aesthetic with 3D card elevation and soft shadows.
-- Physical 3D book cover tilt with realistic spine depth and specular highlights.
-- **Theme Switcher**: 1-click toggle between **Clean White Porcelain ☀️** and **Dark Luxury Midnight 🌙**.
-
-### 8. ⚡ Zero-Click Profile Auto-Save & Google Auth
-- **Instant Auto-Save**: Name edits and reading goal adjustments (`-5` / `+5`) automatically persist to localStorage and SQLite server with subtle `✓ Auto-saved` status indicator.
-- **Google Sign-In**: 1-tap authentication syncing your library and profile state across devices.
-- **Custom Avatars**: Tap avatar to upload custom images or choose from 3D presets.
+<p align="center">
+  <a href="https://github.com/Sivanesanbalu/Book_AI_Backend/releases"><img src="https://img.shields.io/badge/Release-v2.7.0%20Production-blue.svg?style=for-the-badge&logo=android&logoColor=white" alt="Release v2.7.0"></a>
+  <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"></a>
+  <a href="https://groq.com"><img src="https://img.shields.io/badge/Groq%20Vision-Qwen%20%26%20Llama-F55036.svg?style=for-the-badge" alt="Groq Vision"></a>
+  <a href="https://sqlite.org"><img src="https://img.shields.io/badge/SQLite-WAL%20Engine-003B57.svg?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite WAL"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="MIT License"></a>
+</p>
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## 📱 App Preview & Mobile Interface
+
+| 🏠 Home Dashboard & Metrics Carousel | 🔑 1-Tap Google Account Chooser | 📱 Android System AccountManager |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01_dashboard.png" width="260" alt="Home Dashboard" /> | <img src="docs/screenshots/02_google_account_picker.png" width="260" alt="Google Account Picker" /> | <img src="docs/screenshots/03_native_android_dialog.png" width="260" alt="Native Android Account Chooser" /> |
+
+| 👤 3D Luxury Porcelain User Profile | 🤖 Groq AI Storyteller Companion |
+| :---: | :---: |
+| <img src="docs/screenshots/04_user_profile.png" width="260" alt="User Profile" /> | <img src="docs/screenshots/05_ai_storyteller.png" width="260" alt="AI Storyteller" /> |
+
+---
+
+## 📥 Production Mobile APK Download
+
+Get the standalone native Android release build directly:
+
+[![Download APK](https://img.shields.io/badge/⬇️_Download_BookNest_AI_APK-v2.7.0_Release-4F46E5?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Sivanesanbalu/Book_AI_Backend/raw/main/static/BookNestAI-release.apk)
+
+- **Target Architecture**: Android 8.0+ (API 26 to API 35+)
+- **Security**: Signed with 2048-bit RSA Certificate via `apksigner`
+- **Features**: Real Android `AccountManager` Google Account auto-detection, WebRTC hardware camera access, offline SQLite sync, and smooth 120Hz WebView rendering.
+
+---
+
+## 🌟 Core Architecture & Engineering Highlights
 
 ```mermaid
-graph TD
-    Client["📱 Mobile App / PWA (Clean White 3D UI)"]
-    Tunnel["☁️ Cloudflare HTTPS Tunnel"]
-    FastAPI["⚡ FastAPI Server (Python 3.10+)"]
-    Vision["🧠 Groq Vision AI (Qwen / Llama 3.2 Vision)"]
-    DB["💾 SQLite Mirror (WAL Mode)"]
-    Static["📦 Static Assets & PWA Cache"]
+flowchart TD
+    subgraph Client["📱 Mobile Android App / Web PWA"]
+        Cam["📸 Live Camera Stream (WebRTC)"]
+        UI["🎨 Clean White 3D Porcelain UI"]
+        Bridge["⚡ AndroidAuthBridge (JavaScriptInterface)"]
+        AccMgr["🔑 Android OS AccountManager"]
+        Bot["🤖 Movable Vector AI Bot (Pointer Capture)"]
+    end
 
-    Client -->|HTTPS / WSS| Tunnel
-    Tunnel -->|Proxy :8000| FastAPI
-    FastAPI -->|Image Embed & OCR| Vision
-    FastAPI -->|User & Book Sync| DB
-    FastAPI -->|Serve UI| Static
+    subgraph Edge["☁️ Cloud Edge / Secure Gateway"]
+        Tunnel["🛡️ Cloudflare Zero-Trust Edge / HTTPS Gateway"]
+    end
+
+    subgraph Backend["⚡ Backend Core (FastAPI / ASGI)"]
+        Router["🚀 FastAPI High-Throughput Endpoints"]
+        AuthHandler["🔐 Google Auth & Session Engine"]
+        VisionPipeline["🧠 Vision Pre-Processing & OCR Filter"]
+    end
+
+    subgraph Intelligence["🔮 AI & Database Layer"]
+        Groq["⚡ Groq Vision AI (Qwen 2.5 / Llama 3.2 Multimodal)"]
+        SQLStore[("💾 SQLite WAL Engine (Thread-Safe Lock)")]
+        Catalog[("📚 1,005 Preloaded Master Catalog")]
+    end
+
+    Cam -->|Base64 Frame| Router
+    Bridge <-->|Query Phone Accounts| AccMgr
+    Bridge -->|Auto-Detect Accounts| UI
+    UI -->|1-Tap Switch| AuthHandler
+    Router -->|Cover Image Payload| Groq
+    Groq -->|Title, Author, Genre JSON| Router
+    Router <-->|Async Sync| SQLStore
+    Router <-->|Fast Lookup| Catalog
+    Tunnel <--> Client
+    Tunnel <--> Backend
 ```
-
-- **Backend**: FastAPI, Uvicorn, Python 3.10+
-- **Vision AI**: Groq Cloud SDK (`qwen/qwen3.8-27b`, `llama-3.2-11b-vision-preview`)
-- **Database**: SQLite with Write-Ahead Logging (WAL) for concurrency & crash resilience
-- **Frontend**: Vanilla JS (ES6+), Modern CSS3 Custom Properties, 3D Canvas, HTML5 WebRTC & Pointer Events
-- **Mobile Wrapper**: Native Android WebView (API 24+) with Fullscreen Hardware Acceleration
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Key Features
 
-### Prerequisites
-- Python 3.10 or higher
-- pip & virtualenv
-- Android SDK / ADB (optional, for running on physical Android devices)
-- Groq Cloud API Key ([Get one here](https://console.groq.com))
+### 1. 📸 Google Lens-Style Neural Vision Scanner
+- **Ultra-Fast Multimodal Recognition**: Instant book cover detection powered by Groq's low-latency Vision AI inference (`qwen/qwen3.8-27b` and `llama-3.2-vision`).
+- **Sci-Fi Scanner HUD**: Google Lens-inspired aesthetic with neon corner framing, an animated scanning laser sweep, and real camera shutter haptics (`navigator.vibrate(50)`).
+- **Instant Duplicate Prevention**: Scans cross-reference your personal collection in real time, notifying you if a book is already on your shelf with a 1-tap shortcut to view it.
+- **Continuous Scanning**: One-tap "Scan Another Book" workflow for cataloging entire physical bookshelves in minutes.
 
-### 1. Installation
+### 2. 🔑 Real Android System Google Account Connection (Zero Friction)
+- **Native OS Account Bridge**: Built with Android's native `AccountManager` connected to the web client via `@JavascriptInterface` (`AndroidAuthBridge`).
+- **Automatic Phone Account Discovery**: The app automatically detects all Google accounts registered on the device (`apsiva69@gmail.com`, `imman356889@gmail.com`, etc.) and renders them as 1-tap sign-in options.
+- **Native System Dialog Fallback**: Opens the native Android OS system account chooser dialog (`AccountManager.newChooseAccountIntent`) with automatic radio selection.
+- **Custom Account Support**: Clean expandable drawer allowing login with any Gmail address and custom display name.
+
+### 3. 🎨 Clean White 3D Luxury Porcelain Aesthetic
+- **Minimalist Elegance**: Ultra-clean white porcelain design system with subtle neumorphic drop shadows, 3D elevated surface cards, and glossy glassmorphism.
+- **Micro-Interactions**: Physical 3D card tilt physics, tactile button push states, and fluid CSS transitions.
+- **Haptic Feedback**: Shutter clicks, tab switches, and milestone accomplishments trigger native device vibrations.
+
+### 4. 🎠 Animated Swipe Carousels with Dynamic Pagination
+- **Dashboard Metrics Carousel**: Four primary reading metric cards (Collection Overview, Active Reading & Streak, 2026 Goal Progress, and Accumulated Focus Time) organized into an interactive horizontal swipe carousel.
+- **Morphing Pagination Indicators**: Active dots morph dynamically into glowing 24px pills with full 1:1 scroll position tracking and tap-to-scroll controls.
+- **Reading Wishlist Shelf**: Dedicated horizontal book cover carousel with status badges and instant `▶ Start Read` actions.
+
+### 5. 🤖 Freely Draggable Vector AI Companion Bot
+- **Movable Anywhere on Screen**: Built with HTML5 Pointer Events (`setPointerCapture`) for silky-smooth dragging on both touchscreen devices and desktop mice.
+- **Position Persistence**: Automatically saves and restores the user's preferred bot location across restarts using `localStorage`.
+- **Groq LLM Powered Storyteller**: Context-aware book companion that provides plot summaries, character analyses, and life lessons in English and regional languages.
+
+### 6. ⏱️ Focus Stopwatch & Reading Goal Tracker
+- **Alphabetical Book Selector**: Filter books alphabetically (A to Z) with live completion percentage badges.
+- **Multi-Mode Focus Timer**: Freeform stopwatch or quick presets (15m quick read, 25m Pomodoro, 45m deep focus, 60m marathon).
+- **Live Page Counter**: Input start and ending page numbers for instant pages-per-hour calculation.
+- **Milestone Celebrations**: Canvas confetti cannon animations upon reaching reading milestones or completing books.
+
+### 7. 📚 Curated 1,005-Book Master Catalog
+Preloaded with a comprehensive offline-searchable database spanning **9 major genres**:
+- 💥 **Comics**: Spider-Man, Batman, Watchmen, Sandman, Tintin, Asterix
+- 🎌 **Manga**: One Piece, Naruto, Bleach, Attack on Titan, Death Note, Berserk
+- 🧠 **Non-Fiction & Science**: Sapiens, Thinking Fast and Slow, Cosmos, A Brief History of Time
+- 🚀 **Sci-Fi & Fantasy**: Dune, The Hobbit, Foundation, Neuromancer, Hyperion
+- ⚡ **Personal Growth**: Atomic Habits, Deep Work, Show Your Work, The Alchemist
+- 🏛️ **History & Philosophy**: Meditations, The Republic, Guns Germs and Steel
+- 💡 **Technology & Coding**: Clean Code, Designing Data-Intensive Applications, Pragmatic Programmer
+- 💼 **Business & Leadership**: Zero to One, Good to Great, The Lean Startup
+- 📖 **Classic Literature**: Pride and Prejudice, 1984, To Kill a Mockingbird, Crime and Punishment
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Backend Framework** | FastAPI (Python 3.10+), Uvicorn ASGI |
+| **Vision & Language AI** | Groq Cloud API (`qwen/qwen3.8-27b`, `llama-3.2-11b-vision-preview`, `llama-3.3-70b-versatile`) |
+| **Local Storage** | SQLite 3 with Write-Ahead Logging (`PRAGMA journal_mode=WAL`) |
+| **Cloud Database Mirror** | Google Cloud Firestore (Dual-write hybrid mode) |
+| **Mobile Architecture** | Android Native SDK (Java 8 bytecode, `AccountManager`, Hardware-accelerated `WebViewClient`) |
+| **Android Toolchain** | Google Android Build Tools (`d8` dexer, `aapt`, `zipalign`, `apksigner`) |
+| **Frontend Stack** | Vanilla ES6+ JavaScript, Modern CSS3 Custom Properties, WebRTC MediaStream, HTML5 Pointer Events |
+| **Animations & FX** | Lottie Animations, Canvas Confetti Engine, CSS 3D Transforms |
+
+---
+
+## ⚙️ Production Setup & Deployment
+
+### 1. Environment Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/Sivanesanbalu/Book_AI_Backend.git
 cd Book_AI_Backend
 
-# Create and activate virtual environment
+# Create and activate Python virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
+# Install production dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Configuration
+### 2. Environment Variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the project root:
 
 ```env
 GROQ_API_KEY=gsk_your_groq_api_key_here
-PORT=8000
 HOST=0.0.0.0
+PORT=8000
 ```
 
-### 3. Run the Backend Server
+### 3. Start Production Server
 
 ```bash
-python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-Access the web interface at **`http://localhost:8000`**.
+### 4. Deploy via Docker
 
-### 4. Run on Mobile Device via Cloudflare Tunnel
+```dockerfile
+FROM python:3.10-slim
 
-```bash
-# Start Cloudflare HTTP2 tunnel
-cloudflared tunnel --protocol http2 --url http://localhost:8000
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-Copy the generated `https://*.trycloudflare.com` URL and open it on your mobile device or update `MainActivity.java`.
-
-### 5. Install & Run on Android Device (via ADB)
+Build and run the container:
 
 ```bash
-# Ensure your Android phone has USB Debugging enabled
-adb devices
-
-# Install pre-built signed APK
-adb install -r static/BookNestAI-release.apk
-
-# Launch BookNest AI
-adb shell am start -n com.booknest.ai/.MainActivity
+docker build -t booknest-ai .
+docker run -d -p 8000:8000 --env-file .env booknest-ai
 ```
 
 ---
 
-## 📁 Repository Structure
+## 📦 Building the Android Release APK
 
-```text
-Book_AI_Backend/
-├── main.py                  # FastAPI server, endpoints & router
-├── firebase_service.py      # SQLite persistence layer (WAL mode)
-├── vision_ai/
-│   ├── vision.py            # Groq multimodal vision cover recognition
-│   ├── ai_summary.py        # AI storyteller & narrative generator
-│   └── book_fetcher.py      # Google Books & OpenLibrary fallback
-├── data/
-│   └── books.json           # 1,005 books master catalog database
-├── static/
-│   ├── index.html           # Main Single Page App (PWA)
-│   ├── css/app.css          # Clean White 3D luxury stylesheet
-│   ├── js/app.js            # Frontend reactive engine, bot & timer
-│   ├── manifest.json        # PWA configuration
-│   └── BookNestAI-release.apk # Production signed Android release APK
-├── templates/
-│   └── index.html           # Server-side Jinja template mirror
-├── android/
-│   ├── AndroidManifest.xml  # Android app manifest with camera permissions
-│   ├── src/                 # Native Java WebView wrapper (MainActivity.java)
-│   └── res/                 # App icons, layouts & resources
-└── scripts/
-    └── generate_1000_books.py # 1,005 catalog seeder script
+The project includes the complete native Android packaging pipeline:
+
+```bash
+# 1. Set SDK and build tools paths
+SDK_BT="$ANDROID_HOME/build-tools/35.0.0"
+PLATFORM="$ANDROID_HOME/platforms/android-34/android.jar"
+
+cd android
+
+# 2. Compile Java sources with Java 8 bytecode compatibility
+javac -source 8 -target 8 -cp "$PLATFORM" -d bin/ src/com/booknest/ai/*.java
+
+# 3. Dex class files into Dalvik Executable
+$SDK_BT/d8 --output bin/ $(find bin/com -name "*.class")
+
+# 4. Package Android resources
+$SDK_BT/aapt package -f -M AndroidManifest.xml -S res -I "$PLATFORM" -F bin/unaligned.apk bin/
+
+# 5. Zipalign APK on 4-byte boundaries
+$SDK_BT/zipalign -f -p 4 bin/unaligned.apk bin/aligned.apk
+
+# 6. Cryptographically sign APK
+$SDK_BT/apksigner sign --ks ~/.android/debug.keystore --ks-pass pass:android --key-pass pass:android --out ../static/BookNestAI-release.apk bin/aligned.apk
+
+# 7. Install onto physical device
+adb install -r ../static/BookNestAI-release.apk
 ```
 
 ---
 
-## 📡 API Endpoints
+## 📡 REST API Reference
 
 | Method | Endpoint | Description |
 | :---: | :--- | :--- |
 | `GET` | `/` | Serves the 3D Single Page Web App |
-| `POST` | `/scan` | Uploads book cover image for AI Vision identification |
+| `POST` | `/scan` | Uploads book cover image for Groq AI Vision identification |
 | `GET` | `/api/library` | Retrieves user's personal book collection |
-| `POST` | `/api/library/add` | Saves a book with status and category |
+| `POST` | `/api/library/add` | Adds a new book to the personal library |
 | `POST` | `/api/library/update` | Updates reading progress, status, pages, or rating |
 | `DELETE` | `/api/library/remove` | Removes a book from personal collection |
 | `POST` | `/api/timer/session` | Logs reading stopwatch session (minutes & pages) |
-| `POST` | `/api/chat` | Communicates with the AI Story Companion |
-| `GET` | `/api/profile` | Fetches user profile metrics and goals |
-| `POST` | `/api/profile` | Auto-saves user profile name and reading goals |
-| `POST` | `/api/auth/google` | Authenticates Google user account |
-| `GET` | `/api/network-info` | Returns local and tunnel network URLs + QR code |
-| `GET` | `/download` | Downloads production signed Android release APK |
+| `POST` | `/api/chat` | AI Story Companion conversation endpoint |
+| `GET` | `/api/profile` | Fetches user profile metrics, goals, and badges |
+| `POST` | `/api/profile` | Auto-saves profile adjustments (name, goal) |
+| `POST` | `/api/profile/avatar` | Handles custom photo/avatar uploads |
+| `POST` | `/api/auth/google` | Authenticates Google user account and mirrors profile |
+| `GET` | `/api/network-info` | Returns network connectivity data and QR code |
+| `GET` | `/download` | Downloads the compiled Android release APK |
+
+---
+
+## 👨‍💻 Author
+
+**Sivanesan Balu**
+- GitHub: [@Sivanesanbalu](https://github.com/Sivanesanbalu)
+- Project Repository: [Book_AI_Backend](https://github.com/Sivanesanbalu/Book_AI_Backend)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
----
-
-<p align="center">
-  Crafted with ❤️ for book lovers everywhere.
-</p>
+This project is open-source and available under the [MIT License](LICENSE).
