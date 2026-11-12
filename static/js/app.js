@@ -231,7 +231,7 @@ function updateUserUI() {
   const editName = document.getElementById('edit-profile-name');
   const editGoal = document.getElementById('edit-reading-goal');
   const googleLoginBtn = document.getElementById('google-login-btn');
-  const logoutBtn = document.getElementById('logout-btn');
+  const loggedInActions = document.getElementById('logged-in-actions');
 
   if (headerAvatar) headerAvatar.src = currentUser.avatar;
   if (profileAvatar) profileAvatar.src = currentUser.avatar;
@@ -241,15 +241,13 @@ function updateUserUI() {
   if (editGoal) editGoal.value = currentUser.reading_goal || 25;
 
   if (isAuth) {
-    // Once logged in: Show ONLY the logout button, NO sign in button!
-    if (headerName) headerName.textContent = currentUser.name.split(' ')[0] || 'Profile';
+    if (headerName) headerName.textContent = (currentUser.name || 'User').split(' ')[0] || 'Profile';
     if (googleLoginBtn) googleLoginBtn.style.display = 'none';
-    if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+    if (loggedInActions) loggedInActions.style.display = 'flex';
   } else {
-    // When logged out: Show sign in button, hide logout button
     if (headerName) headerName.textContent = 'Sign In';
     if (googleLoginBtn) googleLoginBtn.style.display = 'inline-flex';
-    if (logoutBtn) logoutBtn.style.display = 'none';
+    if (loggedInActions) loggedInActions.style.display = 'none';
   }
 }
 
@@ -264,63 +262,136 @@ function handleLogout() {
   updateDashboardView();
   filterLibrary();
   loadProfile();
+  renderGoogleAccountsList();
   showToast('👋 You have been logged out.');
+}
+
+function getSavedGoogleAccounts() {
+  const defaultAccounts = [
+    {
+      name: 'Sivanesan Balu',
+      email: 'apsiva69@gmail.com',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80'
+    }
+  ];
+  try {
+    const saved = localStorage.getItem('booknest_google_accounts');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return defaultAccounts;
+}
+
+function saveGoogleAccount(account) {
+  const accounts = getSavedGoogleAccounts();
+  const existsIdx = accounts.findIndex(a => a.email.toLowerCase() === account.email.toLowerCase());
+  if (existsIdx >= 0) {
+    accounts[existsIdx] = { ...accounts[existsIdx], ...account };
+  } else {
+    accounts.unshift(account);
+  }
+  localStorage.setItem('booknest_google_accounts', JSON.stringify(accounts.slice(0, 5)));
+}
+
+function renderGoogleAccountsList() {
+  const container = document.getElementById('google-accounts-list');
+  if (!container) return;
+
+  const accounts = getSavedGoogleAccounts();
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+  const currentEmail = (currentUser.email || '').toLowerCase();
+
+  container.innerHTML = accounts.map(acc => {
+    const isCurrent = isAuth && acc.email.toLowerCase() === currentEmail;
+    return `
+      <button type="button" class="google-account-btn google-account-choice-btn" data-email="${acc.email}" data-name="${acc.name}" data-avatar="${acc.avatar}">
+        <img src="${acc.avatar}" class="g-account-avatar" alt="${acc.name}">
+        <div class="g-account-info">
+          <div class="g-account-name">${acc.name}</div>
+          <div class="g-account-sub">${acc.email}</div>
+        </div>
+        ${isCurrent ? '<span class="g-account-badge">● Active</span>' : '<span class="g-account-action">Sign In</span>'}
+      </button>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.google-account-choice-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.getAttribute('data-name');
+      const email = btn.getAttribute('data-email');
+      const avatar = btn.getAttribute('data-avatar');
+      performGoogleLogin(name, email, avatar);
+    });
+  });
 }
 
 function initAuthUI() {
   const authHeaderBtn = document.getElementById('auth-header-btn');
   const googleLoginBtn = document.getElementById('google-login-btn');
+  const switchAccountBtn = document.getElementById('switch-account-btn');
   const logoutBtn = document.getElementById('logout-btn');
   const instantGoogleBtn = document.getElementById('instant-google-btn');
-  const quickGoogleUserBtn = document.getElementById('google-quick-user-btn');
+  const cancelCustomGoogleBtn = document.getElementById('cancel-custom-google-btn');
+  const submitCustomGoogleBtn = document.getElementById('submit-custom-google-btn');
   const closeAuthModal = document.getElementById('close-auth-modal');
   const changeAvatarBtn = document.getElementById('change-avatar-btn');
   const uploadCustomAvatarBtn = document.getElementById('upload-custom-avatar-btn');
+  const profileAvatarUploadTrigger = document.getElementById('profile-avatar-upload-trigger');
 
-  // Open Auth Modal or Jump to Profile if already logged in
+  renderGoogleAccountsList();
+
+  // Header Avatar click: Jump to Profile if logged in, else open Auth Modal
   authHeaderBtn?.addEventListener('click', () => {
     const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
     if (isAuth) {
       switchToTab('tab-profile');
     } else {
+      renderGoogleAccountsList();
       authModal.showModal();
     }
   });
 
-  googleLoginBtn?.addEventListener('click', () => authModal.showModal());
+  googleLoginBtn?.addEventListener('click', () => {
+    renderGoogleAccountsList();
+    authModal.showModal();
+  });
 
-  // Logout Button click listener
+  switchAccountBtn?.addEventListener('click', () => {
+    renderGoogleAccountsList();
+    authModal.showModal();
+  });
+
   logoutBtn?.addEventListener('click', handleLogout);
 
-  // Close Auth Modal
   closeAuthModal?.addEventListener('click', () => {
     localStorage.setItem('booknest_auth_modal_dismissed', 'true');
-    authModal.close();
+    try {
+      if (authModal && authModal.open) authModal.close();
+    } catch (e) {
+      authModal?.removeAttribute('open');
+    }
   });
 
-  // Direct 1-Click Google Sign-In with apsiva69@gmail.com (Sivanesan Balu)
-  quickGoogleUserBtn?.addEventListener('click', () => {
-    performGoogleLogin(
-      'Sivanesan Balu',
-      'apsiva69@gmail.com',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80'
-    );
-  });
-
-  // Switch / Custom Google Login toggle
+  // Toggle Add / Use Another Account Form
   instantGoogleBtn?.addEventListener('click', () => {
     const box = document.getElementById('another-google-box');
     if (box) {
       const isVisible = box.style.display !== 'none';
       box.style.display = isVisible ? 'none' : 'block';
       if (!isVisible) {
-        document.getElementById('custom-google-name')?.focus();
+        document.getElementById('custom-google-email')?.focus();
       }
     }
   });
 
-  // Submit Custom Google Account
-  document.getElementById('submit-custom-google-btn')?.addEventListener('click', submitCustomGoogleLogin);
+  cancelCustomGoogleBtn?.addEventListener('click', () => {
+    const box = document.getElementById('another-google-box');
+    if (box) box.style.display = 'none';
+  });
+
+  submitCustomGoogleBtn?.addEventListener('click', submitCustomGoogleLogin);
   document.getElementById('custom-google-email')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') submitCustomGoogleLogin();
   });
@@ -337,7 +408,6 @@ function initAuthUI() {
   });
 
   // Avatar file upload triggers
-  const profileAvatarUploadTrigger = document.getElementById('profile-avatar-upload-trigger');
   changeAvatarBtn?.addEventListener('click', () => avatarFileInput.click());
   profileAvatarUploadTrigger?.addEventListener('click', () => avatarFileInput.click());
   uploadCustomAvatarBtn?.addEventListener('click', () => avatarFileInput.click());
@@ -346,56 +416,92 @@ function initAuthUI() {
 }
 
 async function performGoogleLogin(name, email, avatar) {
-  const uid = 'google_' + btoa((email || name).toLowerCase()).substring(0, 16);
+  const cleanEmail = (email || 'user@gmail.com').toLowerCase().trim();
+  const cleanName = (name || cleanEmail.split('@')[0] || 'Reader').trim();
+  
+  // Safe UID without btoa
+  let hash = 0;
+  for (let i = 0; i < cleanEmail.length; i++) {
+    hash = ((hash << 5) - hash) + cleanEmail.charCodeAt(i);
+    hash |= 0;
+  }
+  const uid = 'google_' + Math.abs(hash).toString(36) + '_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+
+  const finalAvatar = avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=e0e7ff`;
+
   const payload = {
     uid: uid,
-    name: name,
-    email: email,
-    avatar: avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`,
+    name: cleanName,
+    email: cleanEmail,
+    avatar: finalAvatar,
     reading_goal: 25
   };
 
   try {
-    const res = await fetch('/api/auth/google', {
+    await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    currentUser = { ...payload };
-    localStorage.setItem('booknest_user', JSON.stringify(currentUser));
-    localStorage.setItem('booknest_user_authenticated', 'true');
-    updateUserUI();
-    authModal?.close();
-    showToast(`✅ Welcome, ${currentUser.name}! Signed in with Google`);
+  } catch (fetchErr) {
+    console.warn('Backend mirror failed, continuing with client state:', fetchErr);
+  }
+
+  // Save auth state
+  currentUser = { ...payload };
+  localStorage.setItem('booknest_user', JSON.stringify(currentUser));
+  localStorage.setItem('booknest_user_authenticated', 'true');
+  localStorage.setItem('booknest_auth_modal_dismissed', 'true');
+  saveGoogleAccount({ name: cleanName, email: cleanEmail, avatar: finalAvatar });
+
+  updateUserUI();
+  renderGoogleAccountsList();
+
+  // Safely close dialog
+  try {
+    if (authModal && authModal.open) {
+      authModal.close();
+    }
+  } catch (dialogErr) {
+    authModal?.removeAttribute('open');
+  }
+
+  showToast(`✅ Welcome, ${cleanName}! Signed in with Google`);
+
+  try {
     await loadLibrary();
     await loadProfile();
-  } catch (err) {
-    console.error('Google sign-in error:', err);
-    showToast('⚠️ Could not complete Google sign-in');
+  } catch (loadErr) {
+    console.error('Error reloading after login:', loadErr);
   }
 }
 
 async function submitCustomGoogleLogin() {
-  const nameInput = document.getElementById('custom-google-name');
   const emailInput = document.getElementById('custom-google-email');
+  const nameInput = document.getElementById('custom-google-name');
 
-  const rawName = nameInput ? nameInput.value.trim() : '';
   let rawEmail = emailInput ? emailInput.value.trim() : '';
+  const rawName = nameInput ? nameInput.value.trim() : '';
 
-  if (!rawName && !rawEmail) {
-    showToast('⚠️ Please enter an account name or Gmail address');
+  if (!rawEmail && !rawName) {
+    showToast('⚠️ Please enter an email address or account name');
     return;
   }
 
-  const name = rawName || (rawEmail ? rawEmail.split('@')[0] : 'Sivanesan Balu');
   if (!rawEmail) {
-    rawEmail = name.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
+    rawEmail = rawName.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
   } else if (!rawEmail.includes('@')) {
     rawEmail = rawEmail + '@gmail.com';
   }
 
-  const googleAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`;
-  await performGoogleLogin(name, rawEmail, googleAvatar);
+  const name = rawName || rawEmail.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase());
+  const avatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`;
+
+  // Hide the input box
+  const box = document.getElementById('another-google-box');
+  if (box) box.style.display = 'none';
+
+  await performGoogleLogin(name, rawEmail, avatar);
 }
 
 async function applyNewAvatar(avatarUrl) {

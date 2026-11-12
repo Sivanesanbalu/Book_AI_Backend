@@ -35,6 +35,8 @@ public class MainActivity extends Activity {
         mWebView.setBackgroundColor(Color.parseColor("#0a0d14"));
         setContentView(mWebView);
 
+        WebView.setWebContentsDebuggingEnabled(true);
+
         WebSettings settings = mWebView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -44,23 +46,24 @@ public class MainActivity extends Activity {
         settings.setAllowContentAccess(true);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
         mWebView.setWebViewClient(new AppWebViewClient());
         mWebView.setWebChromeClient(new AppWebChromeClient(this));
 
+        // Always start loading main page immediately
+        mWebView.loadUrl(APP_URL);
+
         // Request camera permission if not granted
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
-        } else {
-            mWebView.loadUrl(APP_URL);
         }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        mWebView.loadUrl(APP_URL);
     }
 
     @Override
@@ -99,19 +102,21 @@ public class MainActivity extends Activity {
 
         @Override
         public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-            String errorHtml = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
-                "<style>body{background:#0a0d14;color:#f8fafc;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center;}" +
-                ".card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:24px;border-radius:20px;max-width:320px;box-shadow:0 12px 36px rgba(0,0,0,0.4);}" +
-                "h2{margin:0 0 10px 0;font-size:1.2rem;color:#f43f5e;font-weight:800;}" +
-                "p{font-size:0.85rem;color:#94a3b8;line-height:1.5;margin-bottom:20px;}" +
-                "button{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.9rem;box-shadow:0 4px 16px rgba(99,102,241,0.4);}" +
-                "</style></head><body>" +
-                "<div class='card'>" +
-                "<h2>Connection Notice</h2>" +
-                "<p>Unable to connect to BookNest AI server. Please make sure the host is running and tap below to reconnect.</p>" +
-                "<button onclick=\"window.location.href='" + APP_URL + "'\">🔄 Tap to Reconnect</button>" +
-                "</div></body></html>";
-            view.loadDataWithBaseURL(null, errorHtml, "text/html", "UTF-8", null);
+            if (failingUrl != null && (failingUrl.startsWith(APP_URL) || failingUrl.equals(APP_URL) || failingUrl.equals(APP_URL + "/"))) {
+                String errorHtml = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
+                    "<style>body{background:#0a0d14;color:#f8fafc;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center;}" +
+                    ".card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:24px;border-radius:20px;max-width:320px;box-shadow:0 12px 36px rgba(0,0,0,0.4);}" +
+                    "h2{margin:0 0 10px 0;font-size:1.2rem;color:#f43f5e;font-weight:800;}" +
+                    "p{font-size:0.85rem;color:#94a3b8;line-height:1.5;margin-bottom:20px;}" +
+                    "button{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.9rem;box-shadow:0 4px 16px rgba(99,102,241,0.4);}" +
+                    "</style></head><body>" +
+                    "<div class='card'>" +
+                    "<h2>Connection Notice</h2>" +
+                    "<p>Unable to connect to BookNest AI server. Please make sure the host is running and tap below to reconnect.</p>" +
+                    "<button onclick=\"window.location.href='" + APP_URL + "'\">🔄 Tap to Reconnect</button>" +
+                    "</div></body></html>";
+                view.loadDataWithBaseURL(null, errorHtml, "text/html", "UTF-8", null);
+            }
         }
     }
 
@@ -120,6 +125,12 @@ public class MainActivity extends Activity {
 
         public AppWebChromeClient(MainActivity activity) {
             this.activity = activity;
+        }
+
+        @Override
+        public boolean onConsoleMessage(android.webkit.ConsoleMessage consoleMessage) {
+            android.util.Log.d("BookNestWeb", consoleMessage.message() + " [" + consoleMessage.sourceId() + ":" + consoleMessage.lineNumber() + "]");
+            return true;
         }
 
         @Override

@@ -1415,53 +1415,133 @@ body::before {
   color: #ef4444;
 }
 
-/* Google Account Quick Sign-in Card */
-.google-login-card {
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-radius: 18px;
-  padding: 12px;
-  margin-bottom: 16px;
+/* Google Account Chooser & Modern Sheet */
+.google-accounts-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.google-user-quick-btn {
+.google-accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.google-account-btn {
   display: flex;
   align-items: center;
   gap: 12px;
   background: var(--bg-surface);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 14px;
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
   padding: 10px 14px;
   width: 100%;
+  box-sizing: border-box;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.2s ease;
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.google-user-quick-btn:hover {
+.google-account-btn:hover,
+.google-account-btn:active {
   border-color: var(--accent-primary);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04), rgba(168, 85, 247, 0.04));
   transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
 }
 
-.g-avatar-wrap {
-  width: 36px;
-  height: 36px;
+.g-account-avatar {
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-subtle);
   background: #f1f5f9;
+}
+
+.add-avatar-circle {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--accent-primary);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.g-account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.g-account-name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.g-account-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.g-account-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
   flex-shrink: 0;
 }
 
-.g-login-action {
-  font-size: 0.78rem;
+.g-account-action {
+  font-size: 0.75rem;
   font-weight: 800;
   color: #4285F4;
   background: rgba(66, 133, 244, 0.1);
   padding: 4px 10px;
   border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.g-account-chevron {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Switch Account Pill Button on Profile Tab */
+.switch-account-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.switch-account-pill-btn:hover,
+.switch-account-pill-btn:active {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
 /* Secondary Filter Pills */
