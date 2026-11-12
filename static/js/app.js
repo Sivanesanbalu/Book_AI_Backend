@@ -271,14 +271,66 @@ function getSavedGoogleAccounts() {
     {
       name: 'Sivanesan Balu',
       email: 'apsiva69@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80'
+      avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Sivanesan%20Balu&backgroundColor=e0e7ff'
+    },
+    {
+      name: 'Imman',
+      email: 'imman356889@gmail.com',
+      avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Imman&backgroundColor=e0e7ff'
+    },
+    {
+      name: 'Siva Hack',
+      email: 'sivahack96@gmail.com',
+      avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Siva%20Hack&backgroundColor=e0e7ff'
     }
   ];
+
+  // If native Android bridge provides phone accounts, incorporate them
+  if (window.AndroidGoogleAuth && typeof window.AndroidGoogleAuth.getPhoneGoogleAccountsJson === 'function') {
+    try {
+      const raw = window.AndroidGoogleAuth.getPhoneGoogleAccountsJson();
+      const phoneList = JSON.parse(raw);
+      if (Array.isArray(phoneList)) {
+        phoneList.forEach(email => {
+          const cleanEmail = (email || '').trim().toLowerCase();
+          if (cleanEmail && !defaultAccounts.some(a => a.email.toLowerCase() === cleanEmail)) {
+            let name = 'Google User';
+            if (cleanEmail.includes('apsiva') || cleanEmail.includes('sivanesan')) {
+              name = 'Sivanesan Balu';
+            } else if (cleanEmail.includes('imman')) {
+              name = 'Imman';
+            } else if (cleanEmail.includes('sivahack')) {
+              name = 'Siva Hack';
+            } else {
+              const rawName = cleanEmail.split('@')[0].replace(/[0-9]/g, '').replace(/[._]/g, ' ').trim();
+              if (rawName) name = rawName.replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+            }
+            defaultAccounts.push({
+              name: name,
+              email: cleanEmail,
+              avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Could not parse phone accounts:', e);
+    }
+  }
+
   try {
     const saved = localStorage.getItem('booknest_google_accounts');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const merged = [...parsed];
+        defaultAccounts.forEach(da => {
+          if (!merged.some(m => m.email.toLowerCase() === da.email.toLowerCase())) {
+            merged.push(da);
+          }
+        });
+        return merged;
+      }
     }
   } catch (e) {}
   return defaultAccounts;
@@ -292,7 +344,7 @@ function saveGoogleAccount(account) {
   } else {
     accounts.unshift(account);
   }
-  localStorage.setItem('booknest_google_accounts', JSON.stringify(accounts.slice(0, 5)));
+  localStorage.setItem('booknest_google_accounts', JSON.stringify(accounts.slice(0, 10)));
 }
 
 function renderGoogleAccountsList() {
@@ -327,10 +379,40 @@ function renderGoogleAccountsList() {
   });
 }
 
+// Native Android Google Account Chooser Callback
+window.onNativeGoogleAccountSelected = function(selectedEmail) {
+  console.log('📱 Native Google Account selected from phone:', selectedEmail);
+  const cleanEmail = (selectedEmail || '').trim().toLowerCase();
+  if (!cleanEmail) return;
+
+  let displayName = '';
+  if (cleanEmail.includes('siva') || cleanEmail.includes('apsiva69')) {
+    displayName = 'Sivanesan Balu';
+  } else if (cleanEmail.includes('imman')) {
+    displayName = 'Imman';
+  } else if (cleanEmail.includes('sivahack')) {
+    displayName = 'Siva Hack';
+  } else {
+    const namePart = cleanEmail.split('@')[0].replace(/[0-9]/g, '').replace(/[._]/g, ' ').trim();
+    displayName = namePart ? namePart.replace(/(?:^|\s)\S/g, a => a.toUpperCase()) : 'Google User';
+  }
+
+  const avatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(displayName)}&backgroundColor=e0e7ff`;
+  performGoogleLogin(displayName, cleanEmail, avatar);
+};
+
+function openNativeOrModalGoogleSignIn() {
+  renderGoogleAccountsList();
+  if (authModal) {
+    authModal.showModal();
+  }
+}
+
 function initAuthUI() {
   const authHeaderBtn = document.getElementById('auth-header-btn');
   const googleLoginBtn = document.getElementById('google-login-btn');
   const switchAccountBtn = document.getElementById('switch-account-btn');
+  const nativePhoneGoogleBtn = document.getElementById('native-phone-google-btn');
   const logoutBtn = document.getElementById('logout-btn');
   const instantGoogleBtn = document.getElementById('instant-google-btn');
   const cancelCustomGoogleBtn = document.getElementById('cancel-custom-google-btn');
@@ -342,26 +424,27 @@ function initAuthUI() {
 
   renderGoogleAccountsList();
 
+  // Connect Real Phone Google Account
+  nativePhoneGoogleBtn?.addEventListener('click', () => {
+    if (window.AndroidGoogleAuth && typeof window.AndroidGoogleAuth.openGoogleAccountChooser === 'function') {
+      window.AndroidGoogleAuth.openGoogleAccountChooser();
+    } else {
+      showToast('ℹ️ Running in web browser. Select account below or enter Gmail.');
+    }
+  });
+
   // Header Avatar click: Jump to Profile if logged in, else open Auth Modal
   authHeaderBtn?.addEventListener('click', () => {
     const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
     if (isAuth) {
       switchToTab('tab-profile');
     } else {
-      renderGoogleAccountsList();
-      authModal.showModal();
+      openNativeOrModalGoogleSignIn();
     }
   });
 
-  googleLoginBtn?.addEventListener('click', () => {
-    renderGoogleAccountsList();
-    authModal.showModal();
-  });
-
-  switchAccountBtn?.addEventListener('click', () => {
-    renderGoogleAccountsList();
-    authModal.showModal();
-  });
+  googleLoginBtn?.addEventListener('click', openNativeOrModalGoogleSignIn);
+  switchAccountBtn?.addEventListener('click', openNativeOrModalGoogleSignIn);
 
   logoutBtn?.addEventListener('click', handleLogout);
 

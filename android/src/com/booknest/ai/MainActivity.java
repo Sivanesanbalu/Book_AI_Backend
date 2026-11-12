@@ -8,6 +8,9 @@ import android.webkit.WebViewClient;
 import android.webkit.WebChromeClient;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
+import android.webkit.JavascriptInterface;
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.net.Uri;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -22,6 +25,7 @@ public class MainActivity extends Activity {
     public ValueCallback<Uri[]> mUploadMessage;
     public final static int FILECHOOSER_RESULTCODE = 1;
     private final static int CAMERA_PERMISSION_CODE = 100;
+    private final static int GOOGLE_ACCOUNT_PICKER_REQUEST = 1001;
     private static final String APP_URL = "https://relationship-cruises-garcia-kelkoo.trycloudflare.com";
 
     @Override
@@ -49,6 +53,9 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
+        // Native Android Bridge for Real Phone Google Accounts
+        mWebView.addJavascriptInterface(new AndroidAuthBridge(this), "AndroidGoogleAuth");
+
         mWebView.setWebViewClient(new AppWebViewClient());
         mWebView.setWebChromeClient(new AppWebChromeClient(this));
 
@@ -68,7 +75,47 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == FILECHOOSER_RESULTCODE) {
+        if (requestCode == GOOGLE_ACCOUNT_PICKER_REQUEST) {
+            android.util.Log.d("BookNestAuth", "Picker resultCode=" + resultCode + " data=" + data);
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                String accountName = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+                if (accountName == null || accountName.trim().isEmpty()) {
+                    accountName = data.getStringExtra("authAccount");
+                }
+                if (accountName == null || accountName.trim().isEmpty()) {
+                    accountName = data.getStringExtra("accountName");
+                }
+                if ((accountName == null || accountName.trim().isEmpty()) && data.getExtras() != null) {
+                    for (String key : data.getExtras().keySet()) {
+                        Object val = data.getExtras().get(key);
+                        android.util.Log.d("BookNestAuth", "Intent extra: " + key + " = " + val);
+                        if (val instanceof String && ((String) val).contains("@")) {
+                            accountName = (String) val;
+                            break;
+                        }
+                    }
+                }
+                android.util.Log.d("BookNestAuth", "Resolved accountName=" + accountName);
+                if (accountName != null && !accountName.trim().isEmpty()) {
+                    final String chosenEmail = accountName.trim();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            String js = "(function() {" +
+                                "if (typeof window.onNativeGoogleAccountSelected === 'function') {" +
+                                "    window.onNativeGoogleAccountSelected('" + chosenEmail.replace("'", "\\'") + "');" +
+                                "} else if (typeof performGoogleLogin === 'function') {" +
+                                "    performGoogleLogin('', '" + chosenEmail.replace("'", "\\'") + "', '');" +
+                                "}" +
+                                "})();";
+                            mWebView.evaluateJavascript(js, null);
+                        }
+                    });
+                }
+            } else {
+                android.util.Log.d("BookNestAuth", "Account picker cancelled or no account picked.");
+            }
+        } else if (requestCode == FILECHOOSER_RESULTCODE) {
             if (mUploadMessage == null) return;
             Uri[] results = null;
             if (resultCode == Activity.RESULT_OK && data != null) {
@@ -81,6 +128,72 @@ public class MainActivity extends Activity {
             mUploadMessage = null;
         } else {
             super.onActivityResult(requestCode, resultCode, data);
+        }
+    }
+
+    public class AndroidAuthBridge {
+        private final MainActivity activity;
+
+        public AndroidAuthBridge(MainActivity activity) {
+            this.activity = activity;
+        }
+
+        @JavascriptInterface
+        public String getPhoneGoogleAccountsJson() {
+            try {
+                Account[] accounts = AccountManager.get(activity).getAccountsByType("com.google");
+                if (accounts != null && accounts.length > 0) {
+                    StringBuilder sb = new StringBuilder("[");
+                    for (int i = 0; i < accounts.length; i++) {
+                        if (accounts[i] != null && accounts[i].name != null) {
+                            if (i > 0) sb.append(",");
+                            sb.append("\"").append(accounts[i].name.replace("\"", "\\\"")).append("\"");
+                        }
+                    }
+                    sb.append("]");
+                    android.util.Log.d("BookNestAuth", "Found phone Google accounts: " + sb.toString());
+                    return sb.toString();
+                }
+            } catch (Exception e) {
+                android.util.Log.e("BookNestAuth", "Failed querying phone Google accounts", e);
+            }
+            return "[]";
+        }
+
+        @JavascriptInterface
+        public void openGoogleAccountChooser() {
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Account selectedAccount = null;
+                        try {
+                            Account[] accounts = AccountManager.get(activity).getAccountsByType("com.google");
+                            if (accounts != null && accounts.length > 0) {
+                                selectedAccount = accounts[0];
+                            }
+                        } catch (Exception ignored) {}
+
+                        Intent intent = AccountManager.newChooseAccountIntent(
+                            selectedAccount,
+                            null,
+                            new String[]{"com.google"},
+                            "Select your Google Account for BookNest AI",
+                            null,
+                            null,
+                            null
+                        );
+                        activity.startActivityForResult(intent, GOOGLE_ACCOUNT_PICKER_REQUEST);
+                    } catch (Exception e) {
+                        android.util.Log.e("BookNestWeb", "Failed to launch Google account picker", e);
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isNativeApp() {
+            return true;
         }
     }
 
