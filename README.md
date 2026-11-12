@@ -18,9 +18,15 @@
 
 ---
 
+## 📖 Overview
+
+**BookNest AI** turns physical book covers into an interactive digital library. Simply snap a photo of any book cover to automatically identify it, detect duplicates, and add it to your shelf. With an embedded focus reading stopwatch, habit trackers, 3D porcelain cards, and a Groq Vision AI Storyteller companion, BookNest AI bridges physical reading with intelligent digital workflows.
+
+---
+
 ## 📱 App Preview & Mobile Interface
 
-| 🏠 Home Dashboard & Carousel | 📚 My Library Catalog | 📖 3D Bookshelf Grid |
+| 🏠 Home Dashboard & Metrics | 📚 My Library Catalog | 📖 3D Bookshelf Grid |
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/01_home_dashboard.png" width="260" alt="Home Dashboard" /> | <img src="docs/screenshots/02_library_catalog.png" width="260" alt="Library Catalog" /> | <img src="docs/screenshots/03_library_shelf.png" width="260" alt="Bookshelf Grid" /> |
 
@@ -42,11 +48,11 @@ Get the standalone native Android release build directly:
 
 - **Target Architecture**: Android 8.0+ (API 26 to API 35+)
 - **Security**: Signed with 2048-bit RSA Certificate via `apksigner`
-- **Features**: Real Android `AccountManager` Google Account auto-detection, WebRTC hardware camera access, offline SQLite sync, and smooth 120Hz WebView rendering.
+- **Native OS Bridge**: Direct Android `AccountManager` Google account detection, WebRTC camera hardware access, offline SQLite sync, and smooth 120Hz WebView rendering.
 
 ---
 
-## 🌟 Core Architecture & Engineering Highlights
+## 🌟 Architecture & System Design
 
 ```mermaid
 flowchart TD
@@ -78,166 +84,32 @@ flowchart TD
     Bridge <-->|Query Phone Accounts| AccMgr
     Bridge -->|Auto-Detect Accounts| UI
     UI -->|1-Tap Switch| AuthHandler
-    Router -->|Cover Image Payload| Groq
-    Groq -->|Title, Author, Genre JSON| Router
-    Router <-->|Async Sync| SQLStore
-    Router <-->|Fast Lookup| Catalog
-    Tunnel <--> Client
-    Tunnel <--> Backend
+    Router -->|Cover Image Payload| VisionPipeline
+    VisionPipeline -->|Vision Query| Groq
+    Groq -->|Extracted Title & Author| Router
+    Router <-->|Query & Persist| SQLStore
+    Router <-->|Similarity Search| Catalog
+    Router -->|JSON Response| UI
 ```
 
 ---
 
-## 🚀 Key Features
+## 🔍 How Cover Recognition Works
 
-### 1. 📸 Google Lens-Style Neural Vision Scanner
-- **Ultra-Fast Multimodal Recognition**: Instant book cover detection powered by Groq's low-latency Vision AI inference (`qwen/qwen3.8-27b` and `llama-3.2-vision`).
-- **Sci-Fi Scanner HUD**: Google Lens-inspired aesthetic with neon corner framing, an animated scanning laser sweep, and real camera shutter haptics (`navigator.vibrate(50)`).
-- **Instant Duplicate Prevention**: Scans cross-reference your personal collection in real time, notifying you if a book is already on your shelf with a 1-tap shortcut to view it.
-- **Continuous Scanning**: One-tap "Scan Another Book" workflow for cataloging entire physical bookshelves in minutes.
-
-### 2. 🔑 Real Android System Google Account Connection (Zero Friction)
-- **Native OS Account Bridge**: Built with Android's native `AccountManager` connected to the web client via `@JavascriptInterface` (`AndroidAuthBridge`).
-- **Automatic Phone Account Discovery**: The app automatically detects all Google accounts registered on the device (`apsiva69@gmail.com`, `imman356889@gmail.com`, etc.) and renders them as 1-tap sign-in options.
-- **Native System Dialog Fallback**: Opens the native Android OS system account chooser dialog (`AccountManager.newChooseAccountIntent`) with automatic radio selection.
-- **Custom Account Support**: Clean expandable drawer allowing login with any Gmail address and custom display name.
-
-### 3. 🎨 Clean White 3D Luxury Porcelain Aesthetic
-- **Minimalist Elegance**: Ultra-clean white porcelain design system with subtle neumorphic drop shadows, 3D elevated surface cards, and glossy glassmorphism.
-- **Micro-Interactions**: Physical 3D card tilt physics, tactile button push states, and fluid CSS transitions.
-- **Haptic Feedback**: Shutter clicks, tab switches, and milestone accomplishments trigger native device vibrations.
-
-### 4. 🎠 Animated Swipe Carousels with Dynamic Pagination
-- **Dashboard Metrics Carousel**: Four primary reading metric cards (Collection Overview, Active Reading & Streak, 2026 Goal Progress, and Accumulated Focus Time) organized into an interactive horizontal swipe carousel.
-- **Morphing Pagination Indicators**: Active dots morph dynamically into glowing 24px pills with full 1:1 scroll position tracking and tap-to-scroll controls.
-- **Reading Wishlist Shelf**: Dedicated horizontal book cover carousel with status badges and instant `▶ Start Read` actions.
-
-### 5. 🤖 Freely Draggable Vector AI Companion Bot
-- **Movable Anywhere on Screen**: Built with HTML5 Pointer Events (`setPointerCapture`) for silky-smooth dragging on both touchscreen devices and desktop mice.
-- **Position Persistence**: Automatically saves and restores the user's preferred bot location across restarts using `localStorage`.
-- **Groq LLM Powered Storyteller**: Context-aware book companion that provides plot summaries, character analyses, and life lessons in English and regional languages.
-
-### 6. ⏱️ Focus Stopwatch & Reading Goal Tracker
-- **Alphabetical Book Selector**: Filter books alphabetically (A to Z) with live completion percentage badges.
-- **Multi-Mode Focus Timer**: Freeform stopwatch or quick presets (15m quick read, 25m Pomodoro, 45m deep focus, 60m marathon).
-- **Live Page Counter**: Input start and ending page numbers for instant pages-per-hour calculation.
-- **Milestone Celebrations**: Canvas confetti cannon animations upon reaching reading milestones or completing books.
-
-### 7. 📚 Curated 1,005-Book Master Catalog
-Preloaded with a comprehensive offline-searchable database spanning **9 major genres**:
-- 💥 **Comics**: Spider-Man, Batman, Watchmen, Sandman, Tintin, Asterix
-- 🎌 **Manga**: One Piece, Naruto, Bleach, Attack on Titan, Death Note, Berserk
-- 🧠 **Non-Fiction & Science**: Sapiens, Thinking Fast and Slow, Cosmos, A Brief History of Time
-- 🚀 **Sci-Fi & Fantasy**: Dune, The Hobbit, Foundation, Neuromancer, Hyperion
-- ⚡ **Personal Growth**: Atomic Habits, Deep Work, Show Your Work, The Alchemist
-- 🏛️ **History & Philosophy**: Meditations, The Republic, Guns Germs and Steel
-- 💡 **Technology & Coding**: Clean Code, Designing Data-Intensive Applications, Pragmatic Programmer
-- 💼 **Business & Leadership**: Zero to One, Good to Great, The Lean Startup
-- 📖 **Classic Literature**: Pride and Prejudice, 1984, To Kill a Mockingbird, Crime and Punishment
+1. **Capture & Preprocessing**: The web app captures a camera frame or uploaded image and posts it to `/scan` (up to 10 MiB).
+2. **Local Feature Matching**: The backend extracts visual features using ConvNeXt embeddings / perceptual image fingerprints, cross-referencing against our preloaded 1,005-book master catalog.
+3. **Groq Multimodal AI Fallback**: If local confidence falls below threshold, the image is passed to Groq Vision AI (`qwen-2.5-32b` / `llama-3.2-11b-vision-preview`), extracting exact title, author, and edition metadata.
+4. **Metadata Enrichment**: Matches are cross-referenced with Google Books API and Open Library for descriptions, page counts, and publication details.
+5. **Ownership Status**: Returns status (`found`, `owned`, or `not_found`) with 3D porcelain cards.
 
 ---
 
-## 🛠️ Technology Stack
+## 🚀 Key Engineering Features
 
-| Layer | Technologies |
-| :--- | :--- |
-| **Backend Framework** | FastAPI (Python 3.10+), Uvicorn ASGI |
-| **Vision & Language AI** | Groq Cloud API (`qwen/qwen3.8-27b`, `llama-3.2-11b-vision-preview`, `llama-3.3-70b-versatile`) |
-| **Local Storage** | SQLite 3 with Write-Ahead Logging (`PRAGMA journal_mode=WAL`) |
-| **Cloud Database Mirror** | Google Cloud Firestore (Dual-write hybrid mode) |
-| **Mobile Architecture** | Android Native SDK (Java 8 bytecode, `AccountManager`, Hardware-accelerated `WebViewClient`) |
-| **Android Toolchain** | Google Android Build Tools (`d8` dexer, `aapt`, `zipalign`, `apksigner`) |
-| **Frontend Stack** | Vanilla ES6+ JavaScript, Modern CSS3 Custom Properties, WebRTC MediaStream, HTML5 Pointer Events |
-| **Animations & FX** | Lottie Animations, Canvas Confetti Engine, CSS 3D Transforms |
-
----
-
-## ⚙️ Production Setup & Deployment
-
-### 1. Environment Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/Sivanesanbalu/Book_AI_Backend.git
-cd Book_AI_Backend
-
-# Create and activate Python virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install production dependencies
-pip install -r requirements.txt
-```
-
-### 2. Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-GROQ_API_KEY=gsk_your_groq_api_key_here
-HOST=0.0.0.0
-PORT=8000
-```
-
-### 3. Start Production Server
-
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
-```
-
-### 4. Deploy via Docker
-
-```dockerfile
-FROM python:3.10-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-Build and run the container:
-
-```bash
-docker build -t booknest-ai .
-docker run -d -p 8000:8000 --env-file .env booknest-ai
-```
-
----
-
-## 📦 Building the Android Release APK
-
-The project includes the complete native Android packaging pipeline:
-
-```bash
-# 1. Set SDK and build tools paths
-SDK_BT="$ANDROID_HOME/build-tools/35.0.0"
-PLATFORM="$ANDROID_HOME/platforms/android-34/android.jar"
-
-cd android
-
-# 2. Compile Java sources with Java 8 bytecode compatibility
-javac -source 8 -target 8 -cp "$PLATFORM" -d bin/ src/com/booknest/ai/*.java
-
-# 3. Dex class files into Dalvik Executable
-$SDK_BT/d8 --output bin/ $(find bin/com -name "*.class")
-
-# 4. Package Android resources
-$SDK_BT/aapt package -f -M AndroidManifest.xml -S res -I "$PLATFORM" -F bin/unaligned.apk bin/
-
-# 5. Zipalign APK on 4-byte boundaries
-$SDK_BT/zipalign -f -p 4 bin/unaligned.apk bin/aligned.apk
-
-# 6. Cryptographically sign APK
-$SDK_BT/apksigner sign --ks ~/.android/debug.keystore --ks-pass pass:android --key-pass pass:android --out ../static/BookNestAI-release.apk bin/aligned.apk
-
-# 7. Install onto physical device
-adb install -r ../static/BookNestAI-release.apk
-```
+- **Zero Hardcoded Localhost**: Dynamically resolves endpoints through relative `/api` paths and Cloudflare HTTPS edge tunneling.
+- **Physical Phone Google Account Sync**: Seamlessly queries device accounts via native Android `AccountManager` and `AndroidAuthBridge`, enabling instant one-tap switching.
+- **Thread-Safe SQLite WAL Engine**: Full WAL (Write-Ahead Logging) mode with explicit threading locks, guaranteeing crash resilience and zero race conditions under concurrent reads and writes.
+- **3D Porcelain Micro-Interactions**: Custom CSS hardware-accelerated transforms, gesture swipes, Pomodoro focus timer with audible chimes, and a floating interactive AI companion.
 
 ---
 
@@ -257,8 +129,31 @@ adb install -r ../static/BookNestAI-release.apk
 | `POST` | `/api/profile` | Auto-saves profile adjustments (name, goal) |
 | `POST` | `/api/profile/avatar` | Handles custom photo/avatar uploads |
 | `POST` | `/api/auth/google` | Authenticates Google user account and mirrors profile |
-| `GET` | `/api/network-info` | Returns network connectivity data and QR code |
 | `GET` | `/download` | Downloads the compiled Android release APK |
+
+---
+
+## ⚙️ Configuration & Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| `GROQ_API_KEY` | Remote multimodal vision and AI storytelling via Groq cloud API. |
+| `FIREBASE_KEY` | Optional Firebase Admin service-account JSON for ID-token verification. |
+| `PORT` | Backend service port (defaults to `8000`). |
+
+---
+
+## 📁 Code Map
+
+| Path | Responsibility |
+| --- | --- |
+| [`main.py`](main.py) | FastAPI routes for scans, library entries, reading sessions, recommendations, and chat |
+| [`image_embedder.py`](image_embedder.py) & [`image_search.py`](image_search.py) | Cover features and vector similarity search |
+| [`vision_ai/`](vision_ai/) | Groq multimodal integration, metadata lookups, and book discussions |
+| [`firebase_service.py`](firebase_service.py) | Thread-safe SQLite persistence and optional Firebase integration |
+| [`android/`](android/) | Standalone Android Native Java wrapper with `AccountManager` bridge |
+| [`static/`](static/) | 3D Porcelain web interface, WebRTC camera, and PWA assets |
+| [`docs/screenshots/`](docs/screenshots/) | High-DPI privacy-clean production screenshots |
 
 ---
 
