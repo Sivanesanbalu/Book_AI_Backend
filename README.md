@@ -20,13 +20,17 @@
 
 ## 📱 App Preview & Mobile Interface
 
-| 🏠 Home Dashboard & Metrics Carousel | 🔑 1-Tap Google Account Chooser | 📱 Android System AccountManager |
+| 🏠 Home Dashboard & Carousel | 📚 My Library Catalog | 📖 3D Bookshelf Grid |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/01_dashboard.png" width="260" alt="Home Dashboard" /> | <img src="docs/screenshots/02_google_account_picker.png" width="260" alt="Google Account Picker" /> | <img src="docs/screenshots/03_native_android_dialog.png" width="260" alt="Native Android Account Chooser" /> |
+| <img src="docs/screenshots/01_home_dashboard.png" width="260" alt="Home Dashboard" /> | <img src="docs/screenshots/02_library_catalog.png" width="260" alt="Library Catalog" /> | <img src="docs/screenshots/03_library_shelf.png" width="260" alt="Bookshelf Grid" /> |
 
-| 👤 3D Luxury Porcelain User Profile | 🤖 Groq AI Storyteller Companion |
+| ⏱️ Focus Reading Timer | 📸 Google Lens Scanner HUD | 🤖 Groq AI Storyteller |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/04_reading_timer.png" width="260" alt="Reading Timer" /> | <img src="docs/screenshots/08_camera_scanner.png" width="260" alt="Camera Scanner" /> | <img src="docs/screenshots/07_ai_storyteller.png" width="260" alt="AI Storyteller" /> |
+
+| 👤 3D Luxury Porcelain Profile | 🔑 1-Tap Google Account Chooser |
 | :---: | :---: |
-| <img src="docs/screenshots/04_user_profile.png" width="260" alt="User Profile" /> | <img src="docs/screenshots/05_ai_storyteller.png" width="260" alt="AI Storyteller" /> |
+| <img src="docs/screenshots/05_user_profile.png" width="260" alt="User Profile" /> | <img src="docs/screenshots/06_google_account_picker.png" width="260" alt="Google Account Picker" /> |
 
 ---
 
