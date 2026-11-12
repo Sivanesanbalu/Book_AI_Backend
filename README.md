@@ -14,7 +14,7 @@ An intelligent, mobile-first book scanner and personal reading companion featuri
 ## 🔗 Live Access & Downloads
 
 - 💻 **Desktop Web App**: [http://localhost:8000](http://localhost:8000)
-- 📱 **Mobile Cloudflare HTTPS Tunnel**: [https://fun-equality-becomes-typical.trycloudflare.com](https://fun-equality-becomes-typical.trycloudflare.com)
+- 📱 **Mobile Cloudflare HTTPS Tunnel**: [https://connector-fixes-mitsubishi-mac.trycloudflare.com](https://connector-fixes-mitsubishi-mac.trycloudflare.com)
 - 📥 **Android Release APK**: [Download BookNest AI Release APK](https://github.com/Sivanesanbalu/Book_AI_Backend/releases/download/v1.0.0/BookNestAI-release.apk)
 
 ---

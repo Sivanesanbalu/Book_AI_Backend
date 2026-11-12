@@ -22,7 +22,7 @@ public class MainActivity extends Activity {
     public ValueCallback<Uri[]> mUploadMessage;
     public final static int FILECHOOSER_RESULTCODE = 1;
     private final static int CAMERA_PERMISSION_CODE = 100;
-    private static final String APP_URL = "https://fun-equality-becomes-typical.trycloudflare.com";
+    private static final String APP_URL = "https://connector-fixes-mitsubishi-mac.trycloudflare.com";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
