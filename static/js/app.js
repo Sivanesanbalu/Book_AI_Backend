@@ -307,8 +307,26 @@ function initAuthUI() {
     );
   });
 
-  // Switch / Custom Google Login prompt
-  instantGoogleBtn?.addEventListener('click', handleGoogleSignIn);
+  // Switch / Custom Google Login toggle
+  instantGoogleBtn?.addEventListener('click', () => {
+    const box = document.getElementById('another-google-box');
+    if (box) {
+      const isVisible = box.style.display !== 'none';
+      box.style.display = isVisible ? 'none' : 'block';
+      if (!isVisible) {
+        document.getElementById('custom-google-name')?.focus();
+      }
+    }
+  });
+
+  // Submit Custom Google Account
+  document.getElementById('submit-custom-google-btn')?.addEventListener('click', submitCustomGoogleLogin);
+  document.getElementById('custom-google-email')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitCustomGoogleLogin();
+  });
+  document.getElementById('custom-google-name')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitCustomGoogleLogin();
+  });
 
   // Avatar presets click
   document.querySelectorAll('.avatar-choice').forEach(choice => {
@@ -355,14 +373,27 @@ async function performGoogleLogin(name, email, avatar) {
   }
 }
 
-async function handleGoogleSignIn() {
-  const promptName = prompt('Enter your Google Account Name:', currentUser.name !== 'Brother Reader' ? currentUser.name : 'Sivanesan Balu');
-  if (!promptName) return;
+async function submitCustomGoogleLogin() {
+  const nameInput = document.getElementById('custom-google-name');
+  const emailInput = document.getElementById('custom-google-email');
 
-  const email = promptName.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
-  const googleAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(promptName)}&backgroundColor=e0e7ff`;
+  const rawName = nameInput ? nameInput.value.trim() : '';
+  let rawEmail = emailInput ? emailInput.value.trim() : '';
 
-  await performGoogleLogin(promptName, email, googleAvatar);
+  if (!rawName && !rawEmail) {
+    showToast('⚠️ Please enter an account name or Gmail address');
+    return;
+  }
+
+  const name = rawName || (rawEmail ? rawEmail.split('@')[0] : 'Sivanesan Balu');
+  if (!rawEmail) {
+    rawEmail = name.toLowerCase().replace(/\s+/g, '.') + '@gmail.com';
+  } else if (!rawEmail.includes('@')) {
+    rawEmail = rawEmail + '@gmail.com';
+  }
+
+  const googleAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}&backgroundColor=e0e7ff`;
+  await performGoogleLogin(name, rawEmail, googleAvatar);
 }
 
 async function applyNewAvatar(avatarUrl) {
