@@ -44,4 +44,4 @@ Thumbs.db
 # logs
 *.log
 
-serviceAccountKey.json
+serviceAccountKey.json*.db
