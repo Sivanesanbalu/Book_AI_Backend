@@ -37,99 +37,18 @@
       </div>
 
       <div class="header-actions">
-        <!-- Google User Profile Pill / Login Trigger -->
-        <button id="auth-header-btn" class="user-pill-btn google-header-pill" title="Google Account, Sign In & Switch Account">
-          <svg class="google-icon" id="header-google-icon" viewBox="0 0 24 24" style="width: 17px; height: 17px; flex-shrink: 0;">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-          </svg>
-          <img id="header-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="header-avatar" alt="Avatar" style="display: none;">
+        <!-- Google User Profile Pill -->
+        <button id="auth-header-btn" class="user-pill-btn" title="Google Account & Profile">
+          <img id="header-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="header-avatar" alt="Avatar">
           <span id="header-user-name" class="header-username">Sign In</span>
-          <span id="header-switch-badge" class="header-switch-tag" style="display: none;">Switch</span>
         </button>
       </div>
     </header>
 
     <!-- ==========================================
-         STARTING POINT: WELCOME & GOOGLE AUTH GATEWAY
-         ========================================== -->
-    <section id="tab-welcome" class="tab-content active">
-      <div class="welcome-container">
-        <!-- Floating 3D Book & Logo Hero -->
-        <div class="welcome-hero-art">
-          <div class="welcome-glow-backdrop"></div>
-          <div class="welcome-book-3d anim-float">
-            <span class="welcome-book-emoji">📖</span>
-            <div class="welcome-badge-cloud">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
-              <span>Google Drive Connected</span>
-            </div>
-          </div>
-        </div>
-
-        <h1 class="welcome-headline">
-          Welcome to <span class="title-highlight">BookNest AI</span>
-        </h1>
-        <p class="welcome-tagline">
-          Your Intelligent Physical Book Scanner, Focus Reading Tracker & Groq Storyteller Companion.
-        </p>
-
-        <!-- 3 Core Feature Badges -->
-        <div class="welcome-features-row">
-          <div class="welcome-feature-chip">
-            <span>📸</span>
-            <span>Cover Scanner</span>
-          </div>
-          <div class="welcome-feature-chip">
-            <span>⏱️</span>
-            <span>Focus Stopwatch</span>
-          </div>
-          <div class="welcome-feature-chip">
-            <span>☁️</span>
-            <span>Google Drive Sync</span>
-          </div>
-        </div>
-
-        <!-- Starting Action Card -->
-        <div class="welcome-auth-card 3d-card">
-          <div class="welcome-auth-header">
-            <div class="welcome-auth-title">Get Started</div>
-            <div class="welcome-auth-sub">Sign in or sign up with your Google account</div>
-          </div>
-
-          <!-- Primary 1-Tap Google Button -->
-          <button type="button" class="welcome-google-primary-btn" onclick="openNativeOrModalGoogleSignIn()">
-            <svg class="google-icon" viewBox="0 0 24 24" style="width: 22px; height: 22px;">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-            </svg>
-            <span>Continue with Google</span>
-          </button>
-
-          <!-- Guest Explore Option -->
-          <div class="welcome-guest-row">
-            <span>Just checking it out?</span>
-            <button type="button" class="welcome-guest-link" onclick="exploreAsGuest()">
-              Explore Demo Dashboard ➔
-            </button>
-          </div>
-        </div>
-
-        <div class="welcome-drive-note">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="#34A853"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-          <span>Zero setup required. Your reading logs and books safely auto-sync to your Google Drive account.</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==========================================
          TAB 0: DASHBOARD / HOME OVERVIEW (FIRST OPTION)
          ========================================== -->
-    <section id="tab-dashboard" class="tab-content">
+    <section id="tab-dashboard" class="tab-content active">
       
       <!-- Welcome Hero Header -->
       <div class="dash-hero-card 3d-card">
@@ -143,36 +62,6 @@
         </div>
         <div class="dash-hero-avatar-wrap">
           <img id="dash-hero-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80" class="dash-hero-avatar" alt="User">
-        </div>
-      </div>
-
-      <!-- Google Account & Google Drive Cloud Sync Card -->
-      <div class="dash-google-card 3d-card" id="dash-google-card">
-        <div class="dash-google-card-left" id="dash-google-card-left" style="cursor: pointer;" title="Manage Google Account & Switcher">
-          <div class="dash-google-icon-circle">
-            <svg class="google-icon" viewBox="0 0 24 24" style="width: 22px; height: 22px;">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-            </svg>
-          </div>
-          <div>
-            <div class="dash-google-title" id="dash-google-title">Sign in with Google</div>
-            <div class="dash-google-desc" id="dash-google-desc">
-              <span id="dash-drive-icon" style="color: #34A853; font-weight: 700;">☁️ Google Drive:</span>
-              <span id="dash-drive-status-label">Sync reading logs & books</span>
-            </div>
-          </div>
-        </div>
-        <div class="dash-google-actions">
-          <button type="button" class="dash-drive-sync-btn" id="dash-drive-sync-btn" title="Synchronize reading logs with Google Drive now">
-            <svg class="sync-spin-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-            <span id="dash-drive-sync-label">Sync</span>
-          </button>
-          <button type="button" class="dash-google-pill-btn" id="dash-google-pill-btn" title="Choose or Switch Google Account">
-            Connect ➔
-          </button>
         </div>
       </div>
 
@@ -384,13 +273,8 @@
       <div class="scanner-viewport fullscreen-viewport">
         <video id="camera-video" autoplay playsinline muted></video>
 
-        <!-- Top Floating Overlay Controls: Back to Home, Flash & AI Scanner Badge -->
+        <!-- Top Floating Overlay Controls: Flash & AI Scanner Badge -->
         <div class="cam-overlay-top">
-          <button class="cam-glass-btn" onclick="switchToTab('tab-dashboard')" title="Back to Home" style="gap: 6px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            <span>Home</span>
-          </button>
-
           <button class="cam-glass-btn" id="flash-toggle-btn" title="Toggle Flash / Torch">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
             <span id="flash-btn-label">Flash</span>
@@ -545,14 +429,6 @@
          ========================================== -->
     <section id="tab-library" class="tab-content">
 
-      <!-- Subpage Back to Home Navigation Bar -->
-      <div class="subpage-nav-bar">
-        <button type="button" class="subpage-back-pill" onclick="switchToTab('tab-dashboard')" title="Back to Home Dashboard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          <span>Back to Home</span>
-        </button>
-      </div>
-
       <!-- Real-time Reading Stats Dashboard Card -->
       <div class="library-dashboard-card 3d-card">
         <div class="dash-header">
@@ -646,15 +522,6 @@
          TAB 3: READING TIMER & STOPWATCH SCREEN
          ========================================== -->
     <section id="tab-timer" class="tab-content">
-
-      <!-- Subpage Back to Home Navigation Bar -->
-      <div class="subpage-nav-bar">
-        <button type="button" class="subpage-back-pill" onclick="switchToTab('tab-dashboard')" title="Back to Home Dashboard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          <span>Back to Home</span>
-        </button>
-      </div>
-
       <div class="timer-card 3d-card">
         <div class="timer-header">
           <div class="timer-badge">⏱️ READING SESSION</div>
@@ -738,15 +605,6 @@
          TAB 4: USER PROFILE & STATS
          ========================================== -->
     <section id="tab-profile" class="tab-content">
-
-      <!-- Subpage Back to Home Navigation Bar -->
-      <div class="subpage-nav-bar">
-        <button type="button" class="subpage-back-pill" onclick="switchToTab('tab-dashboard')" title="Back to Home Dashboard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          <span>Back to Home</span>
-        </button>
-      </div>
-
       <div class="profile-card 3d-card">
         
         <!-- Profile Avatar with 1-Tap Camera/Upload Trigger -->
@@ -792,34 +650,6 @@
               </svg>
               <span>Log Out</span>
             </button>
-          </div>
-        </div>
-
-        <!-- Google Drive Cloud Sync & Backup Panel -->
-        <div class="drive-sync-panel 3d-card" style="margin: 14px 0 10px 0;">
-          <div class="drive-panel-header">
-            <div class="drive-panel-icon">☁️</div>
-            <div>
-              <div class="drive-panel-title">Google Drive Cloud Storage</div>
-              <div class="drive-panel-sub" id="drive-sync-status-text">Connected to your Google Account • Auto-Sync</div>
-            </div>
-            <span class="drive-status-badge">● Active</span>
-          </div>
-
-          <div class="drive-panel-actions">
-            <button type="button" class="drive-action-btn" id="drive-manual-sync-btn" title="Sync now">
-              <svg class="sync-spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-              <span>Sync Now</span>
-            </button>
-            <button type="button" class="drive-action-btn" id="drive-export-btn" title="Download backup JSON">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-              <span>Export Backup</span>
-            </button>
-            <button type="button" class="drive-action-btn" id="drive-restore-trigger-btn" title="Restore from backup JSON">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-              <span>Restore</span>
-            </button>
-            <input type="file" id="drive-restore-file-input" accept=".json,application/json" style="display: none;">
           </div>
         </div>
 
@@ -1125,11 +955,11 @@
             <div style="font-weight: 800; font-size: 0.88rem; margin-bottom: 8px; color: var(--text-primary);">Sign In with Google Account</div>
             <div class="form-row" style="margin-bottom: 8px;">
               <label class="field-micro-label" style="margin-bottom: 4px; display: block; font-weight: 700; font-size: 0.72rem;">Google Email Address:</label>
-              <input type="email" id="custom-google-email" class="profile-input" placeholder="e.g. siva@gmail.com" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem;" autocomplete="email">
+              <input type="email" id="custom-google-email" class="profile-input" placeholder="e.g. yourname@gmail.com" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem;" autocomplete="email">
             </div>
             <div class="form-row" style="margin-bottom: 12px;">
               <label class="field-micro-label" style="margin-bottom: 4px; display: block; font-weight: 700; font-size: 0.72rem;">Account Name (optional):</label>
-              <input type="text" id="custom-google-name" class="profile-input" placeholder="e.g. Sivanesan Balu" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem;" autocomplete="name">
+              <input type="text" id="custom-google-name" class="profile-input" placeholder="e.g. Alex Reader" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem;" autocomplete="name">
             </div>
             <div style="display: flex; gap: 8px;">
               <button type="button" id="cancel-custom-google-btn" class="btn-secondary" style="flex: 1; padding: 8px 12px; font-size: 0.8rem;">
@@ -1175,63 +1005,6 @@
             </div>
           </button>
         </div>
-      </div>
-    </dialog>
-
-    <!-- ==========================================
-         EXIT APP CONFIRMATION MODAL (<dialog>)
-         ========================================== -->
-    <dialog id="exit-confirm-modal" class="auth-dialog exit-dialog" closedby="any" aria-labelledby="exit-modal-title">
-      <div class="dialog-inner" style="text-align: center; max-width: 360px;">
-        <div class="exit-dialog-icon">⚠️</div>
-        <h2 id="exit-modal-title" style="font-size: 1.28rem; font-weight: 800; margin-bottom: 6px; color: var(--text-primary);">
-          Exit BookNest AI?
-        </h2>
-        <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 22px;">
-          Are you sure you want to exit? Your books, reading timer progress, and streaks are safely preserved.
-        </p>
-        <div style="display: flex; gap: 10px;">
-          <button type="button" id="exit-cancel-btn" class="btn-secondary" style="flex: 1; padding: 12px; font-weight: 700; border-radius: 14px;">
-            Keep Reading
-          </button>
-          <button type="button" id="exit-confirm-btn" class="btn-primary" style="flex: 1; padding: 12px; background: linear-gradient(135deg, #ef4444, #dc2626); border: none; color: #fff; font-weight: 800; border-radius: 14px; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);">
-            Exit App
-          </button>
-        </div>
-      </div>
-    </dialog>
-
-    <!-- ==========================================
-         NEW USER ONBOARDING & CELEBRATION MODAL (<dialog>)
-         ========================================== -->
-    <dialog id="welcome-celebrate-modal" class="auth-dialog" closedby="any" aria-labelledby="celebrate-modal-title">
-      <div class="dialog-inner" style="text-align: center; max-width: 380px;">
-        <div style="font-size: 3rem; margin-bottom: 8px;" class="anim-bounce">🎉</div>
-        <h2 id="celebrate-modal-title" style="font-size: 1.35rem; font-weight: 800; margin-bottom: 6px; color: var(--text-primary);">
-          Welcome to BookNest AI!
-        </h2>
-        <p id="celebrate-modal-name" style="font-size: 0.95rem; font-weight: 700; color: #4285F4; margin-bottom: 16px;">
-          Account Created Successfully
-        </p>
-
-        <div style="background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 14px; text-align: left; margin-bottom: 20px;">
-          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; font-weight: 700;">
-            <span style="color: #10b981; font-size: 1.1rem;">✓</span>
-            <span>Google Account Connected</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; font-weight: 700;">
-            <span style="color: #10b981; font-size: 1.1rem;">✓</span>
-            <span>Google Drive Cloud Storage Linked</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 700;">
-            <span style="color: #10b981; font-size: 1.1rem;">✓</span>
-            <span>Personal Library Initialized</span>
-          </div>
-        </div>
-
-        <button type="button" id="start-reading-btn" class="btn-primary 3d-btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 0.92rem;">
-          Go to My Dashboard ➔
-        </button>
       </div>
     </dialog>
 
@@ -1289,7 +1062,7 @@
     <!-- ==========================================
          BOTTOM NAVIGATION BAR (5-TAB MODERN LAYOUT)
          ========================================== -->
-    <nav class="bottom-nav" style="display: none;">
+    <nav class="bottom-nav">
       <a href="#" class="nav-item active" data-tab="tab-dashboard">
         <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         <span>Home</span>
