@@ -1356,6 +1356,38 @@ function initModals() {
     }
   });
 
+  // Modal Personal Notes & Highlights Auto-save
+  let notesDebounce = null;
+  const modalNotesEl = document.getElementById('modal-book-notes');
+  modalNotesEl?.addEventListener('input', () => {
+    if (!selectedModalBook) return;
+    const notesVal = modalNotesEl.value;
+    selectedModalBook.notes = notesVal;
+    localStorage.setItem(`booknest_notes_${selectedModalBook.title}`, notesVal);
+
+    clearTimeout(notesDebounce);
+    notesDebounce = setTimeout(async () => {
+      try {
+        await fetch('/api/library/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentUser.uid}`
+          },
+          body: JSON.stringify({
+            title: selectedModalBook.title,
+            notes: notesVal
+          })
+        });
+        const ind = document.getElementById('notes-saved-indicator');
+        if (ind) {
+          ind.style.opacity = '1';
+          setTimeout(() => { ind.style.opacity = '0'; }, 1800);
+        }
+      } catch (e) {}
+    }, 600);
+  });
+
   // Modal Page Progress Bookmark Save
   document.getElementById('modal-save-page-btn')?.addEventListener('click', async () => {
     if (!selectedModalBook) return;
@@ -1477,6 +1509,12 @@ function openBookModal(encodedTitle) {
     `;
   } else {
     scenarioBox.textContent = `A celebrated ${book.genre || 'book'} by ${book.author}. Tap Chat to explore the story scenario with AI!`;
+  }
+
+  // Set personal notes & highlights
+  const notesArea = document.getElementById('modal-book-notes');
+  if (notesArea) {
+    notesArea.value = book.notes || localStorage.getItem(`booknest_notes_${book.title}`) || '';
   }
 
   bookModal.showModal();
@@ -1894,6 +1932,30 @@ async function loadProfile() {
       const pct = Math.min(100, Math.round((completedBooks / (goal || 1)) * 100));
       fillEl.style.width = `${pct}%`;
     }
+
+    // Update Streak Milestones
+    const streakNum = parseInt(localStorage.getItem('booknest_streak') || '0', 10);
+    const milestones = [
+      { id: 'ms-badge-3', statusId: 'ms-status-3', days: 3 },
+      { id: 'ms-badge-7', statusId: 'ms-status-7', days: 7 },
+      { id: 'ms-badge-30', statusId: 'ms-status-30', days: 30 },
+      { id: 'ms-badge-100', statusId: 'ms-status-100', days: 100 }
+    ];
+    let unlockedCount = 0;
+    milestones.forEach(m => {
+      const card = document.getElementById(m.id);
+      const st = document.getElementById(m.statusId);
+      if (streakNum >= m.days) {
+        unlockedCount++;
+        card?.classList.add('unlocked');
+        if (st) st.textContent = 'Unlocked ⭐';
+      } else {
+        card?.classList.remove('unlocked');
+        if (st) st.textContent = `${m.days - streakNum}d to go`;
+      }
+    });
+    const msCountEl = document.getElementById('milestones-count-text');
+    if (msCountEl) msCountEl.textContent = `${unlockedCount} / 4 Unlocked`;
 
   } catch (err) {
     console.error('Error loading profile:', err);

@@ -157,18 +157,6 @@
         </div>
       </div>
 
-      <!-- 2026 Goal Card -->
-      <div class="dash-goal-card 3d-card">
-        <div class="d-goal-top">
-          <div style="font-weight: 800; font-size: 0.95rem;">2026 Reading Goal</div>
-          <div id="dash-goal-pct" class="d-goal-badge">0%</div>
-        </div>
-        <div class="d-goal-track">
-          <div id="dash-goal-fill" class="d-goal-fill" style="width: 0%;"></div>
-        </div>
-        <div class="d-goal-sub" id="dash-goal-sub">0 of 25 Books Completed</div>
-      </div>
-
       <!-- Currently Reading Highlight Card -->
       <div class="currently-reading-box 3d-card" id="current-reading-shelf">
         <div class="shelf-header">
@@ -243,25 +231,6 @@
         </div>
       </div>
 
-      <!-- Quick Action Shortcuts -->
-      <div class="dash-quick-actions">
-        <button id="dash-quick-scan-btn" class="quick-action-card 3d-card">
-          <div class="qa-icon-wrap bg-blue">📸</div>
-          <div class="qa-text">
-            <div class="qa-title">Scan Book Cover</div>
-            <div class="qa-sub">AI Multimodal Vision</div>
-          </div>
-        </button>
-
-        <button id="dash-quick-timer-btn" class="quick-action-card 3d-card">
-          <div class="qa-icon-wrap bg-emerald">⏱️</div>
-          <div class="qa-text">
-            <div class="qa-title">Reading Stopwatch</div>
-            <div class="qa-sub">Track Session & Pages</div>
-          </div>
-        </button>
-      </div>
-
     </section>
 
     <!-- ==========================================
@@ -282,7 +251,7 @@
 
           <div class="cam-status-pill lens-pill">
             <span class="lens-glow-dot"></span>
-            <span>AI Scanner</span>
+            <span>Visual Cover Scanner</span>
           </div>
         </div>
 
@@ -296,7 +265,7 @@
         </div>
         <div class="lens-pill-caption">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-          <span>Align book cover inside frame</span>
+          <span>Point camera at book cover • Tap shutter to scan</span>
         </div>
 
         <!-- Bottom Floating Controls: Gallery, Shutter, Single Flip -->
@@ -429,50 +398,13 @@
          ========================================== -->
     <section id="tab-library" class="tab-content">
 
-      <!-- Real-time Reading Stats Dashboard Card -->
-      <div class="library-dashboard-card 3d-card">
-        <div class="dash-header">
-          <div>
-            <h2 class="section-heading">My Library</h2>
-            <div class="dash-subtitle">Track, organize & read your books</div>
-          </div>
-          <div class="stats-badge" id="library-count-badge">0 Books</div>
+      <!-- Clean Library Header -->
+      <div class="library-header-bar">
+        <div>
+          <h2 class="section-heading">My Library</h2>
+          <div class="dash-subtitle">Explore, search & organize your book collection</div>
         </div>
-
-        <!-- 4-Stat Metric Row -->
-        <div class="metrics-grid">
-          <div class="metric-box">
-            <div class="metric-icon">📚</div>
-            <div class="metric-val" id="metric-total">0</div>
-            <div class="metric-lbl">Total Books</div>
-          </div>
-          <div class="metric-box highlight-green">
-            <div class="metric-icon">🏆</div>
-            <div class="metric-val" id="metric-completed">0</div>
-            <div class="metric-lbl">Completed</div>
-          </div>
-          <div class="metric-box highlight-blue">
-            <div class="metric-icon">📖</div>
-            <div class="metric-val" id="metric-reading">0</div>
-            <div class="metric-lbl">Reading Now</div>
-          </div>
-          <div class="metric-box highlight-amber">
-            <div class="metric-icon">🎯</div>
-            <div class="metric-val" id="metric-goal-pct">0%</div>
-            <div class="metric-lbl">Goal Done</div>
-          </div>
-        </div>
-
-        <!-- Reading Goal Progress Bar -->
-        <div class="goal-track-wrap">
-          <div class="goal-label-row">
-            <span>2026 Reading Goal</span>
-            <span id="goal-progress-text">0 / 25 Finished</span>
-          </div>
-          <div class="goal-progress-track">
-            <div id="goal-progress-fill" class="goal-progress-fill" style="width: 0%;"></div>
-          </div>
-        </div>
+        <div class="stats-badge" id="library-count-badge">0 Books</div>
       </div>
 
       <!-- Search Bar -->
@@ -716,6 +648,39 @@
           </div>
         </div>
 
+        <!-- Reading Streak Achievement Badges -->
+        <div class="streak-badges-card 3d-card" style="margin: 12px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="font-weight: 800; font-size: 0.88rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+              <span>🏆</span>
+              <span>Reading Milestones</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-muted);" id="milestones-count-text">0 / 4 Unlocked</span>
+          </div>
+          <div class="streak-milestones-row">
+            <div class="milestone-badge-card" id="ms-badge-3">
+              <div class="ms-icon">🥉</div>
+              <div class="ms-title">3 Days</div>
+              <div class="ms-status" id="ms-status-3">Locked</div>
+            </div>
+            <div class="milestone-badge-card" id="ms-badge-7">
+              <div class="ms-icon">🥈</div>
+              <div class="ms-title">7 Days</div>
+              <div class="ms-status" id="ms-status-7">Locked</div>
+            </div>
+            <div class="milestone-badge-card" id="ms-badge-30">
+              <div class="ms-icon">🥇</div>
+              <div class="ms-title">30 Days</div>
+              <div class="ms-status" id="ms-status-30">Locked</div>
+            </div>
+            <div class="milestone-badge-card" id="ms-badge-100">
+              <div class="ms-icon">💎</div>
+              <div class="ms-title">100 Days</div>
+              <div class="ms-status" id="ms-status-100">Locked</div>
+            </div>
+          </div>
+        </div>
+
         <!-- 2026 Reading Goal Progress & Quick Stepper -->
         <div class="goal-progress-card 3d-card">
           <div class="goal-header-row">
@@ -829,18 +794,27 @@
           </div>
         </div>
 
-        <!-- Scenario / Narrative Synopsis -->
+        <!-- Personal Reading Notes & Key Quotes -->
+        <div class="modal-section modal-notes-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="field-micro-label" style="margin: 0;">📝 My Notes & Key Takeaways:</label>
+            <span id="notes-saved-indicator" style="font-size: 0.72rem; color: #10b981; font-weight: 700; opacity: 0; transition: opacity 0.3s ease;">✓ Auto-saved</span>
+          </div>
+          <textarea id="modal-book-notes" class="book-notes-textarea" placeholder="Jot down lessons, memorable quotes, or your thoughts while reading..." rows="3"></textarea>
+        </div>
+
+        <!-- Book Synopsis & Overview -->
         <div class="modal-section">
-          <label class="field-micro-label">AI Story Scenario & World:</label>
+          <label class="field-micro-label">📖 Book Overview & Key Takeaways:</label>
           <div id="modal-scenario-content" class="scenario-callout">
-            Loading story scenario...
+            Loading book details...
           </div>
         </div>
 
         <!-- Actions -->
         <div class="modal-actions">
           <button id="modal-chat-btn" class="btn-primary 3d-btn-primary" style="flex: 2;">
-            💬 Chat with AI Storyteller
+            💬 Ask AI Story Assistant
           </button>
           <button id="modal-delete-btn" class="btn-danger" style="flex: 1;">
             🗑️ Remove
