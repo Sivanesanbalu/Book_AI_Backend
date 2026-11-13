@@ -473,7 +473,7 @@ async def api_recommendations(request: Request, genre: str = Query("Fiction"), l
 async def api_google_auth(payload: dict = Body(...)):
     uid = payload.get("uid") or payload.get("sub") or payload.get("email") or "google_user"
     name = payload.get("name") or "Reader"
-    email = payload.get("email") or "reader@google.com"
+    email = payload.get("email") or ""
     avatar = payload.get("picture") or payload.get("avatar")
     profile, is_new = upsert_google_user(uid=uid, name=name, email=email, avatar=avatar)
     return {
@@ -494,7 +494,7 @@ async def api_drive_status(request: Request):
     return {
         "connected": True,
         "service": "Google Drive",
-        "user_email": profile.get("email", "reader@google.com"),
+        "user_email": profile.get("email", ""),
         "last_synced": profile.get("last_drive_sync") or "Just now",
         "total_books": profile.get("book_count", 0),
         "status": "synced"

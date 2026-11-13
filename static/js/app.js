@@ -14,8 +14,8 @@ let facingMode = 'environment';
 // Guest User Blueprint (Clean State, 0 books)
 const GUEST_USER = {
   uid: 'guest_user',
-  name: 'Reader',
-  email: 'reader@booknest.local',
+  name: 'Guest Reader',
+  email: '',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80',
   reading_goal: 25
 };
@@ -211,13 +211,10 @@ function loadStoredUser() {
 
 function checkFirstTimeUser() {
   const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
-  const isDismissed = localStorage.getItem('booknest_auth_modal_dismissed') === 'true';
-  if (!isAuth && !isDismissed) {
+  if (!isAuth) {
     setTimeout(() => {
-      if (authModal && !authModal.open) {
-        authModal.showModal();
-      }
-    }, 700);
+      openNativeOrModalGoogleSignIn();
+    }, 600);
   }
 }
 
@@ -235,16 +232,23 @@ function updateUserUI() {
 
   if (headerAvatar) headerAvatar.src = currentUser.avatar;
   if (profileAvatar) profileAvatar.src = currentUser.avatar;
-  if (profileName) profileName.textContent = currentUser.name;
-  if (profileEmail) profileEmail.textContent = currentUser.email;
-  if (editName) editName.value = currentUser.name;
+  if (profileName) profileName.textContent = currentUser.name || 'Guest Reader';
+  if (editName) editName.value = currentUser.name || 'Guest Reader';
   if (editGoal) editGoal.value = currentUser.reading_goal || 25;
 
-  if (isAuth) {
+  if (isAuth && currentUser.email) {
+    if (profileEmail) {
+      profileEmail.style.display = 'block';
+      profileEmail.textContent = currentUser.email;
+    }
     if (headerName) headerName.textContent = (currentUser.name || 'User').split(' ')[0] || 'Profile';
     if (googleLoginBtn) googleLoginBtn.style.display = 'none';
     if (loggedInActions) loggedInActions.style.display = 'flex';
   } else {
+    if (profileEmail) {
+      profileEmail.style.display = 'none';
+      profileEmail.textContent = '';
+    }
     if (headerName) headerName.textContent = 'Sign In';
     if (googleLoginBtn) googleLoginBtn.style.display = 'inline-flex';
     if (loggedInActions) loggedInActions.style.display = 'none';
@@ -445,10 +449,14 @@ function initAuthUI() {
 }
 
 async function performGoogleLogin(name, email, avatar) {
-  const cleanEmail = (email || 'user@gmail.com').toLowerCase().trim();
+  const cleanEmail = (email || '').toLowerCase().trim();
+  if (!cleanEmail) {
+    showToast('⚠️ Please select or enter your Google account');
+    return;
+  }
   const cleanName = (name || cleanEmail.split('@')[0] || 'Reader').trim();
   
-  // Safe UID without btoa
+  // Safe deterministic UID from email
   let hash = 0;
   for (let i = 0; i < cleanEmail.length; i++) {
     hash = ((hash << 5) - hash) + cleanEmail.charCodeAt(i);
@@ -467,20 +475,30 @@ async function performGoogleLogin(name, email, avatar) {
   };
 
   try {
-    await fetch('/api/auth/google', {
+    const res = await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    const authData = await res.json();
+    if (authData.profile) {
+      if (authData.profile.reading_goal) payload.reading_goal = authData.profile.reading_goal;
+      if (authData.profile.name) payload.name = authData.profile.name;
+    }
+    if (authData.is_new) {
+      showToast(`🎉 Account Created! Welcome, ${cleanName}!`);
+    } else {
+      showToast(`👋 Welcome back, ${cleanName}!`);
+    }
   } catch (fetchErr) {
     console.warn('Backend mirror failed, continuing with client state:', fetchErr);
+    showToast(`✅ Welcome, ${cleanName}!`);
   }
 
   // Save auth state
   currentUser = { ...payload };
   localStorage.setItem('booknest_user', JSON.stringify(currentUser));
   localStorage.setItem('booknest_user_authenticated', 'true');
-  localStorage.setItem('booknest_auth_modal_dismissed', 'true');
   saveGoogleAccount({ name: cleanName, email: cleanEmail, avatar: finalAvatar });
 
   updateUserUI();
@@ -494,8 +512,6 @@ async function performGoogleLogin(name, email, avatar) {
   } catch (dialogErr) {
     authModal?.removeAttribute('open');
   }
-
-  showToast(`✅ Welcome, ${cleanName}! Signed in with Google`);
 
   try {
     await loadLibrary();

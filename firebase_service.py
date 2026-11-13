@@ -120,11 +120,6 @@ def init_local_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """)
-            # Ensure a default profile exists for the brother / primary user
-            conn.execute("""
-            INSERT OR IGNORE INTO users (uid, name, email, reading_goal, favorite_genres)
-            VALUES ('default_user', 'Brother', 'brother@bookai.local', 25, 'Sci-Fi, AI & Tech, Fiction, Thriller')
-            """)
             conn.commit()
 
 
@@ -301,7 +296,7 @@ def get_user_profile(uid: str):
             user_row = conn.execute("SELECT * FROM users WHERE uid = ?", (uid,)).fetchone()
             if not user_row:
                 conn.execute(
-                    "INSERT INTO users (uid, name, email, avatar, reading_goal) VALUES (?, 'Reader', 'reader@booknest.local', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80', 25)",
+                    "INSERT INTO users (uid, name, email, avatar, reading_goal) VALUES (?, 'Reader', '', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80', 25)",
                     (uid,)
                 )
                 conn.commit()
