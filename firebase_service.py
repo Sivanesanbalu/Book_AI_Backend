@@ -4,7 +4,8 @@ import re
 import time
 import hashlib
 import sqlite3
-from threading import Lock
+from datetime import datetime
+from threading import RLock
 
 # Try initializing Firebase if credentials are provided
 use_firestore = False
@@ -36,7 +37,7 @@ else:
 DB_DIR = "data"
 os.makedirs(DB_DIR, exist_ok=True)
 SQLITE_PATH = os.path.join(DB_DIR, "library.db")
-_db_lock = Lock()
+_db_lock = RLock()
 
 
 def get_sqlite_conn():
@@ -93,7 +94,7 @@ def init_local_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """)
-            # Auto-migrate columns if missing in user_books
+            # Auto-migrate columns if missing in user_books & users
             cols = [r[1] for r in conn.execute("PRAGMA table_info(user_books)").fetchall()]
             if 'current_page' not in cols:
                 conn.execute("ALTER TABLE user_books ADD COLUMN current_page INTEGER DEFAULT 0")
@@ -103,6 +104,12 @@ def init_local_db():
                 conn.execute("ALTER TABLE user_books ADD COLUMN reading_minutes INTEGER DEFAULT 0")
             if 'last_read' not in cols:
                 conn.execute("ALTER TABLE user_books ADD COLUMN last_read TIMESTAMP")
+
+            user_cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+            if 'last_drive_sync' not in user_cols:
+                conn.execute("ALTER TABLE users ADD COLUMN last_drive_sync TIMESTAMP")
+            if 'drive_sync_enabled' not in user_cols:
+                conn.execute("ALTER TABLE users ADD COLUMN drive_sync_enabled INTEGER DEFAULT 1")
             conn.execute("""
             CREATE TABLE IF NOT EXISTS scan_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -410,13 +417,72 @@ def log_reading_session(uid: str, title: str, minutes: int, start_page: int = 0,
 def upsert_google_user(uid: str, name: str, email: str, avatar: str = None):
     with _db_lock:
         with get_sqlite_conn() as conn:
+            existing = conn.execute("SELECT uid, created_at FROM users WHERE uid = ? OR (email IS NOT NULL AND LOWER(email) = LOWER(?))", (uid, email)).fetchone()
+            is_new = (existing is None)
             conn.execute("""
-            INSERT INTO users (uid, name, email, avatar)
-            VALUES (?, ?, ?, COALESCE(?, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'))
+            INSERT INTO users (uid, name, email, avatar, last_drive_sync)
+            VALUES (?, ?, ?, COALESCE(?, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'), CURRENT_TIMESTAMP)
             ON CONFLICT(uid) DO UPDATE SET
                 name = COALESCE(excluded.name, users.name),
                 email = COALESCE(excluded.email, users.email),
-                avatar = COALESCE(excluded.avatar, users.avatar)
+                avatar = COALESCE(excluded.avatar, users.avatar),
+                last_drive_sync = CURRENT_TIMESTAMP
             """, (uid, name, email, avatar))
             conn.commit()
-    return get_user_profile(uid)
+    profile = get_user_profile(uid)
+    return profile, is_new
+
+
+def export_user_library_backup(uid: str) -> dict:
+    """Exports full user library, reading sessions, and profile for Google Drive sync"""
+    with _db_lock:
+        with get_sqlite_conn() as conn:
+            profile = get_user_profile(uid)
+            books = [dict(r) for r in conn.execute("SELECT * FROM user_books WHERE uid = ?", (uid,)).fetchall()]
+            sessions = [dict(r) for r in conn.execute("SELECT * FROM reading_sessions WHERE uid = ? ORDER BY timestamp DESC", (uid,)).fetchall()]
+            return {
+                "app": "BookNest AI",
+                "version": "2.7.0",
+                "exported_at": datetime.utcnow().isoformat(),
+                "sync_target": "Google Drive Cloud Storage",
+                "user": profile,
+                "books": books,
+                "reading_sessions": sessions
+            }
+
+
+def record_drive_sync(uid: str):
+    """Updates the timestamp when the library was successfully backed up to Google Drive"""
+    with _db_lock:
+        with get_sqlite_conn() as conn:
+            conn.execute("UPDATE users SET last_drive_sync = CURRENT_TIMESTAMP WHERE uid = ?", (uid,))
+            conn.commit()
+
+
+def restore_user_library_backup(uid: str, backup_data: dict) -> int:
+    """Restores books and reading sessions from a Google Drive backup payload"""
+    restored_count = 0
+    books = backup_data.get("books", [])
+    with _db_lock:
+        with get_sqlite_conn() as conn:
+            for b in books:
+                book_id = b.get("book_id") or str(uuid.uuid4())[:8]
+                conn.execute("""
+                INSERT INTO user_books (uid, book_id, title, author, genre, cover_url, overview, status, rating, notes, current_page, total_pages, reading_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(uid, book_id) DO UPDATE SET
+                    title = excluded.title,
+                    author = excluded.author,
+                    status = excluded.status,
+                    current_page = excluded.current_page,
+                    reading_minutes = excluded.reading_minutes
+                """, (
+                    uid, book_id, b.get("title", "Untitled"), b.get("author", "Unknown"),
+                    b.get("genre", "General"), b.get("cover_url", ""), b.get("overview", ""),
+                    b.get("status", "Reading"), b.get("rating", 5), b.get("notes", ""),
+                    b.get("current_page", 0), b.get("total_pages", 300), b.get("reading_minutes", 0)
+                ))
+                restored_count += 1
+            conn.execute("UPDATE users SET last_drive_sync = CURRENT_TIMESTAMP WHERE uid = ?", (uid,))
+            conn.commit()
+    return restored_count

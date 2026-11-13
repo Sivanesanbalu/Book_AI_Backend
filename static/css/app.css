@@ -4341,3 +4341,313 @@ dialog::backdrop {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+
+/* =========================================================
+   🚀 WELCOME STARTING POINT & GOOGLE AUTH GATEWAY
+   ========================================================= */
+.welcome-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 16px 40px 16px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.welcome-hero-art {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 10px auto 20px auto;
+}
+
+.welcome-glow-backdrop {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, rgba(66, 133, 244, 0.15) 50%, transparent 70%);
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(0.95); opacity: 0.7; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+.welcome-book-3d {
+  position: relative;
+  z-index: 2;
+  font-size: 4.2rem;
+  filter: drop-shadow(0 14px 28px rgba(99, 102, 241, 0.35));
+}
+
+.welcome-badge-cloud {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  color: #1a73e8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(66, 133, 244, 0.25);
+  border: 1px solid rgba(66, 133, 244, 0.3);
+  white-space: nowrap;
+}
+
+.welcome-headline {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.welcome-tagline {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 24px;
+  max-width: 440px;
+}
+
+.welcome-features-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.welcome-feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.welcome-auth-card {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-card);
+  border-radius: 24px;
+  padding: 24px 20px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.welcome-auth-header {
+  margin-bottom: 18px;
+}
+
+.welcome-auth-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.welcome-auth-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.welcome-google-primary-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #ffffff;
+  color: #1f2937;
+  border: 1.5px solid #dadce0;
+  border-radius: 16px;
+  padding: 14px 20px;
+  font-size: 0.98rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  margin-bottom: 14px;
+}
+
+.welcome-google-primary-btn:hover {
+  border-color: #4285f4;
+  box-shadow: 0 6px 20px rgba(66, 133, 244, 0.2);
+  transform: translateY(-2px);
+}
+
+.welcome-google-primary-btn:active {
+  transform: scale(0.98);
+}
+
+.welcome-guest-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.welcome-guest-link {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.welcome-drive-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  max-width: 420px;
+  line-height: 1.4;
+}
+
+/* =========================================================
+   ☁️ DASHBOARD GOOGLE DRIVE CLOUD SYNC CONTROLS
+   ========================================================= */
+.dash-google-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-drive-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(66, 133, 244, 0.1);
+  color: #1a73e8;
+  border: 1px solid rgba(66, 133, 244, 0.3);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dash-drive-sync-btn:hover {
+  background: rgba(66, 133, 244, 0.18);
+  border-color: #1a73e8;
+}
+
+.dash-drive-sync-btn:active .sync-spin-icon {
+  animation: spinSync 0.8s linear infinite;
+}
+
+@keyframes spinSync {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sync-spinning {
+  animation: spinSync 0.8s linear infinite !important;
+}
+
+/* =========================================================
+   📁 PROFILE GOOGLE DRIVE CLOUD SYNC PANEL
+   ========================================================= */
+.drive-sync-panel {
+  margin-top: 18px;
+  padding: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: 20px;
+}
+
+.drive-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.drive-panel-icon {
+  font-size: 1.8rem;
+}
+
+.drive-panel-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.drive-panel-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.drive-status-badge {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.drive-panel-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.drive-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 10px 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drive-action-btn:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.drive-action-btn:active {
+  transform: scale(0.96);
+}

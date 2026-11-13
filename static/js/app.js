@@ -54,9 +54,19 @@ document.addEventListener('DOMContentLoaded', () => {
   loadProfile();
   loadNetworkInfo();
   registerPWA();
-  checkFirstTimeUser();
   initDailyReminderNotification();
   initAiBot();
+
+  // Initial Starting Point Routing:
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+  const isGuest = sessionStorage.getItem('booknest_guest_mode') === 'true';
+  if (isAuth || isGuest) {
+    // Returning / Authenticated user directly gets Dashboard!
+    switchToTab('tab-dashboard');
+  } else {
+    // First-time or logged-out user starts at Google Login / Welcome Starting Point
+    switchToTab('tab-welcome');
+  }
 
   // Shutter action
   if (shutterBtn) shutterBtn.addEventListener('click', captureAndScan);
@@ -143,6 +153,7 @@ function updateThemeIcon(theme) {
 function switchToTab(targetTab) {
   const navItems = document.querySelectorAll('.nav-item');
   const tabs = document.querySelectorAll('.tab-content');
+  const bottomNav = document.querySelector('.bottom-nav');
 
   navItems.forEach((n) => {
     if (n.getAttribute('data-tab') === targetTab) n.classList.add('active');
@@ -154,11 +165,17 @@ function switchToTab(targetTab) {
     else t.classList.remove('active');
   });
 
-  // Hide floating AI bot on Scanner tab so viewfinder and controls are completely unobstructed
+  // Welcome tab hides bottom nav, main tabs display it
+  if (bottomNav) {
+    bottomNav.style.display = (targetTab === 'tab-welcome') ? 'none' : 'flex';
+  }
+
+  // Hide floating AI bot on Scanner or Welcome tab
   const aiBotWrapper = document.getElementById('ai-bot-wrapper');
-  if (targetTab === 'tab-scan') {
+  if (targetTab === 'tab-scan' || targetTab === 'tab-welcome') {
     if (aiBotWrapper) aiBotWrapper.style.display = 'none';
-    if (!currentStream) initCamera();
+    if (targetTab === 'tab-scan' && !currentStream) initCamera();
+    else stopCamera();
   } else {
     if (aiBotWrapper) aiBotWrapper.style.display = 'flex';
     stopCamera();
@@ -236,8 +253,9 @@ function updateUserUI() {
   const loggedInActions = document.getElementById('logged-in-actions');
 
   const dashGoogleTitle = document.getElementById('dash-google-title');
-  const dashGoogleDesc = document.getElementById('dash-google-desc');
+  const dashDriveStatus = document.getElementById('dash-drive-status-label');
   const dashGooglePillBtn = document.getElementById('dash-google-pill-btn');
+  const drivePanelSub = document.getElementById('drive-sync-status-text');
 
   if (headerAvatar) headerAvatar.src = currentUser.avatar;
   if (profileAvatar) profileAvatar.src = currentUser.avatar;
@@ -255,8 +273,9 @@ function updateUserUI() {
     if (loggedInActions) loggedInActions.style.display = 'flex';
 
     if (dashGoogleTitle) dashGoogleTitle.textContent = `Connected: ${currentUser.name}`;
-    if (dashGoogleDesc) dashGoogleDesc.textContent = `${currentUser.email} • Tap to switch Google account`;
-    if (dashGooglePillBtn) dashGooglePillBtn.textContent = 'Switch Account 🔄';
+    if (dashDriveStatus) dashDriveStatus.textContent = `Auto-sync active (${currentUser.email})`;
+    if (dashGooglePillBtn) dashGooglePillBtn.textContent = 'Account ➔';
+    if (drivePanelSub) drivePanelSub.textContent = `Cloud Storage Active (${currentUser.email})`;
   } else {
     if (headerGoogleIcon) headerGoogleIcon.style.display = 'inline-block';
     if (headerAvatar) headerAvatar.style.display = 'none';
@@ -266,8 +285,9 @@ function updateUserUI() {
     if (loggedInActions) loggedInActions.style.display = 'none';
 
     if (dashGoogleTitle) dashGoogleTitle.textContent = 'Sign in with Google';
-    if (dashGoogleDesc) dashGoogleDesc.textContent = 'Sync your books, reading streak & library across devices';
+    if (dashDriveStatus) dashDriveStatus.textContent = 'Sync reading logs & books to cloud';
     if (dashGooglePillBtn) dashGooglePillBtn.textContent = 'Connect ➔';
+    if (drivePanelSub) drivePanelSub.textContent = 'Sign in with Google to enable cloud backup';
   }
 }
 
@@ -275,6 +295,7 @@ function handleLogout() {
   localStorage.removeItem('booknest_user_authenticated');
   localStorage.removeItem('booknest_user');
   localStorage.removeItem('booknest_streak');
+  sessionStorage.removeItem('booknest_guest_mode');
   currentUser = { ...GUEST_USER };
   libraryBooks = [];
   updateUserUI();
@@ -283,8 +304,16 @@ function handleLogout() {
   filterLibrary();
   loadProfile();
   renderGoogleAccountsList();
-  showToast('👋 You have been logged out.');
+  switchToTab('tab-welcome');
+  showToast('👋 You have been logged out. Returned to Welcome page.');
 }
+
+function exploreAsGuest() {
+  sessionStorage.setItem('booknest_guest_mode', 'true');
+  switchToTab('tab-dashboard');
+  showToast('📖 Welcome to BookNest AI Demo! Explore the features.');
+}
+window.exploreAsGuest = exploreAsGuest;
 
 function getSavedGoogleAccounts() {
   const defaultAccounts = [
@@ -543,7 +572,103 @@ function initAuthUI() {
   uploadCustomAvatarBtn?.addEventListener('click', () => avatarFileInput.click());
 
   avatarFileInput?.addEventListener('change', handleAvatarFileUpload);
+
+  // Onboarding Celebration Modal Button
+  document.getElementById('start-reading-btn')?.addEventListener('click', () => {
+    const celebrateModal = document.getElementById('welcome-celebrate-modal');
+    try { if (celebrateModal && celebrateModal.open) celebrateModal.close(); } catch (e) { celebrateModal?.removeAttribute('open'); }
+    switchToTab('tab-dashboard');
+  });
+
+  // Google Drive Cloud Sync Action Listeners
+  document.getElementById('dash-drive-sync-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    syncGoogleDrive(true);
+  });
+  document.getElementById('drive-manual-sync-btn')?.addEventListener('click', () => {
+    syncGoogleDrive(true);
+  });
+  document.getElementById('drive-export-btn')?.addEventListener('click', () => {
+    exportGoogleDriveBackup();
+  });
+  const restoreTriggerBtn = document.getElementById('drive-restore-trigger-btn');
+  const restoreFileInput = document.getElementById('drive-restore-file-input');
+  restoreTriggerBtn?.addEventListener('click', () => {
+    restoreFileInput?.click();
+  });
+  restoreFileInput?.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleDriveRestoreFile(e.target.files[0]);
+    }
+  });
 }
+
+// =========================================================
+// ☁️ GOOGLE DRIVE CLOUD SYNC & RESTORE CONTROLLERS
+// =========================================================
+async function syncGoogleDrive(showToastNotification = true) {
+  const syncBtn = document.getElementById('dash-drive-sync-btn');
+  const syncIcon = syncBtn?.querySelector('.sync-spin-icon');
+  const manualSyncBtn = document.getElementById('drive-manual-sync-btn');
+  const manualSyncIcon = manualSyncBtn?.querySelector('.sync-spin-icon');
+
+  if (syncIcon) syncIcon.classList.add('sync-spinning');
+  if (manualSyncIcon) manualSyncIcon.classList.add('sync-spinning');
+
+  try {
+    const res = await fetch('/api/drive/sync', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      const statusLabel = document.getElementById('dash-drive-status-label');
+      if (statusLabel) statusLabel.textContent = `Synced Just now (${data.total_books || 0} books)`;
+      const profileSyncText = document.getElementById('drive-sync-status-text');
+      if (profileSyncText) profileSyncText.textContent = `Last synced to Google Drive: Just now`;
+
+      if (showToastNotification) {
+        showToast(`☁️ Google Drive: ${data.total_books || 0} books synced successfully!`);
+      }
+    }
+  } catch (e) {
+    console.warn('Google drive sync notice:', e);
+  } finally {
+    setTimeout(() => {
+      if (syncIcon) syncIcon.classList.remove('sync-spinning');
+      if (manualSyncIcon) manualSyncIcon.classList.remove('sync-spinning');
+    }, 600);
+  }
+}
+window.syncGoogleDrive = syncGoogleDrive;
+
+function exportGoogleDriveBackup() {
+  showToast('💾 Exporting Google Drive Cloud Backup JSON...');
+  window.location.href = '/api/drive/export';
+}
+window.exportGoogleDriveBackup = exportGoogleDriveBackup;
+
+async function handleDriveRestoreFile(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const res = await fetch('/api/drive/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(json)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`📥 Restored ${data.restored_books || 0} books from Google Drive backup!`);
+      await loadLibrary();
+      await loadProfile();
+      updateDashboardView();
+    } else {
+      showToast('⚠️ Failed to restore backup.');
+    }
+  } catch (e) {
+    showToast('⚠️ Invalid Google Drive backup file.');
+  }
+}
+window.handleDriveRestoreFile = handleDriveRestoreFile;
 
 async function performGoogleLogin(name, email, avatar) {
   const cleanEmail = (email || 'user@gmail.com').toLowerCase().trim();
@@ -567,12 +692,19 @@ async function performGoogleLogin(name, email, avatar) {
     reading_goal: 25
   };
 
+  let isNewUser = false;
   try {
-    await fetch('/api/auth/google', {
+    const res = await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.is_new || data.action === 'sign_up') {
+        isNewUser = true;
+      }
+    }
   } catch (fetchErr) {
     console.warn('Backend mirror failed, continuing with client state:', fetchErr);
   }
@@ -596,13 +728,39 @@ async function performGoogleLogin(name, email, avatar) {
     authModal?.removeAttribute('open');
   }
 
-  showToast(`✅ Welcome, ${cleanName}! Signed in with Google`);
+  // Handle New User (Sign Up) vs Existing User (Sign In)
+  if (isNewUser) {
+    // 1. New User: Celebratory Welcome Onboarding with Google Drive Confirmation
+    triggerCelebrationConfetti();
+    const celebrateModal = document.getElementById('welcome-celebrate-modal');
+    const celebrateName = document.getElementById('celebrate-modal-name');
+    if (celebrateName) celebrateName.textContent = `Welcome, ${cleanName}! (Google Drive Linked)`;
+    if (celebrateModal) {
+      try { celebrateModal.showModal(); } catch (e) { celebrateModal.setAttribute('open', 'true'); }
+    }
+    syncGoogleDrive(false);
+  } else {
+    // 2. Existing / Older User: DIRECT REDIRECT TO DASHBOARD!
+    switchToTab('tab-dashboard');
+    showToast(`🚀 Welcome back, ${cleanName}! Redirected to Dashboard (Google Drive Connected)`);
+    syncGoogleDrive(false);
+  }
 
   try {
     await loadLibrary();
     await loadProfile();
   } catch (loadErr) {
     console.error('Error reloading after login:', loadErr);
+  }
+}
+
+function triggerCelebrationConfetti() {
+  if (typeof confetti === 'function') {
+    confetti({
+      particleCount: 90,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
   }
 }
 

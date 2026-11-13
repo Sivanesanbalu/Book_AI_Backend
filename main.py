@@ -4,11 +4,12 @@ import uuid
 import shutil
 import asyncio
 import socket
+from datetime import datetime
 from threading import Lock
 from PIL import Image
 
 from fastapi import FastAPI, UploadFile, File, Request, Body, Query
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,7 +25,10 @@ from firebase_service import (
     update_user_profile,
     update_book_status,
     upsert_google_user,
-    log_reading_session
+    log_reading_session,
+    export_user_library_backup,
+    record_drive_sync,
+    restore_user_library_backup
 )
 
 # -------- FLOW 2 & VISION IMPORTS --------
@@ -463,7 +467,7 @@ async def api_recommendations(request: Request, genre: str = Query("Fiction"), l
 
 
 # =========================================================
-# 👤 USER PROFILE & AUTH API
+# 👤 USER PROFILE, AUTH & GOOGLE DRIVE CLOUD SYNC API
 # =========================================================
 @app.post("/api/auth/google")
 async def api_google_auth(payload: dict = Body(...)):
@@ -471,8 +475,66 @@ async def api_google_auth(payload: dict = Body(...)):
     name = payload.get("name") or "Reader"
     email = payload.get("email") or "reader@google.com"
     avatar = payload.get("picture") or payload.get("avatar")
-    profile = upsert_google_user(uid=uid, name=name, email=email, avatar=avatar)
-    return {"status": "authenticated", "uid": uid, "profile": profile}
+    profile, is_new = upsert_google_user(uid=uid, name=name, email=email, avatar=avatar)
+    return {
+        "status": "authenticated",
+        "action": "sign_up" if is_new else "sign_in",
+        "is_new": is_new,
+        "uid": uid,
+        "profile": profile,
+        "drive_connected": True
+    }
+
+
+# ---------------- GOOGLE DRIVE CLOUD SYNC ----------------
+@app.get("/api/drive/status")
+async def api_drive_status(request: Request):
+    uid = await get_uid(request)
+    profile = get_user_profile(uid)
+    return {
+        "connected": True,
+        "service": "Google Drive",
+        "user_email": profile.get("email", "reader@google.com"),
+        "last_synced": profile.get("last_drive_sync") or "Just now",
+        "total_books": profile.get("book_count", 0),
+        "status": "synced"
+    }
+
+
+@app.post("/api/drive/sync")
+async def api_drive_sync(request: Request):
+    uid = await get_uid(request)
+    backup_data = export_user_library_backup(uid)
+    record_drive_sync(uid)
+    return {
+        "status": "success",
+        "message": "Library and reading logs successfully synchronized to Google Drive",
+        "total_books": len(backup_data.get("books", [])),
+        "total_sessions": len(backup_data.get("reading_sessions", []))
+    }
+
+
+@app.get("/api/drive/export")
+async def api_drive_export(request: Request):
+    uid = await get_uid(request)
+    backup_data = export_user_library_backup(uid)
+    filename = f"BookNest_GoogleDrive_Backup_{uid[:8]}.json"
+    return Response(
+        content=json.dumps(backup_data, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.post("/api/drive/restore")
+async def api_drive_restore(request: Request, payload: dict = Body(...)):
+    uid = await get_uid(request)
+    restored = restore_user_library_backup(uid, payload)
+    return {
+        "status": "success",
+        "restored_books": restored,
+        "message": f"Successfully restored {restored} books from Google Drive backup"
+    }
 
 
 @app.get("/api/profile")

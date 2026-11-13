@@ -26,7 +26,7 @@ public class MainActivity extends Activity {
     public final static int FILECHOOSER_RESULTCODE = 1;
     private final static int CAMERA_PERMISSION_CODE = 100;
     private final static int GOOGLE_ACCOUNT_PICKER_REQUEST = 1001;
-    private static final String APP_URL = "https://relationship-cruises-garcia-kelkoo.trycloudflare.com";
+    private static final String APP_URL = "https://research-faces-guide-thompson.trycloudflare.com";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
