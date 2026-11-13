@@ -3190,6 +3190,9 @@ window.handleAppBackPress = function() {
 // 🔄 APP RETURN / FOREGROUND REDIRECT TO HOME PAGE
 // =========================================================
 function redirectToHomePage() {
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+  const isGuest = sessionStorage.getItem('booknest_guest_mode') === 'true';
+
   // Close any open modals
   const openModals = document.querySelectorAll('dialog[open]');
   openModals.forEach(m => {
@@ -3200,25 +3203,41 @@ function redirectToHomePage() {
     chatModal.classList.remove('active');
   }
 
-  // Switch to Home Dashboard tab
-  switchToTab('tab-dashboard');
+  // If authenticated/guest, redirect to Dashboard. Otherwise stay on Welcome starting screen.
+  if (isAuth || isGuest) {
+    switchToTab('tab-dashboard');
+  } else {
+    switchToTab('tab-welcome');
+  }
 }
 window.redirectToHomePage = redirectToHomePage;
 
 // When user returns to the app from background or another app
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    console.log('📱 App returned to foreground: redirecting to Home Dashboard');
-    redirectToHomePage();
+    const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+    const isGuest = sessionStorage.getItem('booknest_guest_mode') === 'true';
+    if (isAuth || isGuest) {
+      console.log('📱 App returned to foreground: redirecting to Home Dashboard');
+      redirectToHomePage();
+    }
   }
 });
 
 window.addEventListener('focus', () => {
-  console.log('📱 Window regained focus: redirecting to Home Dashboard');
-  redirectToHomePage();
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+  const isGuest = sessionStorage.getItem('booknest_guest_mode') === 'true';
+  if (isAuth || isGuest) {
+    console.log('📱 Window regained focus: redirecting to Home Dashboard');
+    redirectToHomePage();
+  }
 });
 
 window.addEventListener('pageshow', (event) => {
-  console.log('📱 Page show event triggered: redirecting to Home Dashboard');
-  redirectToHomePage();
+  const isAuth = localStorage.getItem('booknest_user_authenticated') === 'true';
+  const isGuest = sessionStorage.getItem('booknest_guest_mode') === 'true';
+  if (isAuth || isGuest) {
+    console.log('📱 Page show event triggered: redirecting to Home Dashboard');
+    redirectToHomePage();
+  }
 });
